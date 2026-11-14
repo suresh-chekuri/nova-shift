@@ -1,12 +1,35 @@
 // NOVA SHIFT multiplayer server. Run with: npm run server  (also started by npm run dev)
 import { createServer } from 'node:http';
+import { createReadStream, existsSync, statSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
 import { Rooms } from './rooms.js';
 
 const PORT = process.env.PORT || 3001;
+// In production the server also serves the built game (the "dist" folder), so one port does everything.
+const DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist');
+const TYPES = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
+  '.glb': 'model/gltf-binary', '.wasm': 'application/wasm', '.png': 'image/png', '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.txt': 'text/plain',
+};
 const http = createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('NOVA SHIFT server is running.');
+  if (!existsSync(DIST)) {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('NOVA SHIFT server is running.');
+    return;
+  }
+  let rel = decodeURIComponent((req.url || '/').split('?')[0]);
+  if (rel === '/') rel = '/index.html';
+  let file = path.join(DIST, rel);
+  if (!file.startsWith(DIST) || !existsSync(file) || !statSync(file).isFile()) file = path.join(DIST, 'index.html');
+  const ext = path.extname(file).toLowerCase();
+  res.writeHead(200, {
+    'Content-Type': TYPES[ext] || 'application/octet-stream',
+    'Cache-Control': rel.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
+  });
+  createReadStream(file).pipe(res);
 });
 const io = new Server(http, { cors: { origin: '*' } });
 const rooms = new Rooms();

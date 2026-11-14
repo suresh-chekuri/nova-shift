@@ -13,7 +13,7 @@ function leaveLocal(msg: string) {
 
 function ensure(): Socket {
   if (socket) return socket;
-  const s = io(`http://${window.location.hostname}:3001`, { transports: ['websocket', 'polling'], reconnection: false });
+  const s = io(import.meta.env.DEV ? `http://${window.location.hostname}:3001` : window.location.origin, { transports: ['websocket', 'polling'], reconnection: false });
   socket = s;
   s.on('connect', () => useNet.setState({ connected: true, myId: s.id ?? '', error: '' }));
   s.on('disconnect', () => {
