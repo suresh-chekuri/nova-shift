@@ -34,7 +34,8 @@ function ensure(): Socket {
   s.on('game:start', ({ design }) => launch('mission', design));
   s.on('game:action', ({ name, args, from }) => applyRemoteAction(name, args, from));
   s.on('game:state', (state) => {
-    if (useNet.getState().mode === 'client') useGame.setState(state);
+    if (useNet.getState().mode !== 'client') return;
+    try { useGame.setState(state); } catch (e) { console.error('[NOVA SHIFT] bad game state from host', e); }
   });
   // Positions arrive 10 times a second. Nothing subscribes to `remote` (the 3D players read it every frame),
   // so we write to it directly on purpose. This avoids re-rendering React on every message.

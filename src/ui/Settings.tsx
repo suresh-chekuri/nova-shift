@@ -32,6 +32,8 @@ export function SettingsScreen() {
               <button key={q} className={'btn small ' + (st.quality === q ? 'primary' : '')} onClick={() => { sfx.click(); updateSettings({ quality: q }); }}>{q.toUpperCase()}</button>
             ))}
           </div></div>
+        <div className="set-row"><label>Real crew suit for other players <b>{st.crewSuit ? 'ON' : 'OFF'}</b></label>
+          <button className={'btn ' + (st.crewSuit ? 'primary' : '')} onClick={() => updateSettings({ crewSuit: !st.crewSuit })}>{st.crewSuit ? 'TURN OFF' : 'TURN ON'}</button></div>
         <div className="set-row"><label>Crew suit faces backwards? <b>{st.suitFlip ? 'FLIPPED' : 'NORMAL'}</b></label>
           <button className={'btn ' + (st.suitFlip ? 'primary' : '')} onClick={() => updateSettings({ suitFlip: !st.suitFlip })}>FLIP DIRECTION</button></div>
         <div className="tiny">If the game feels slow on your Mac, set Model detail to LOW, then turn off Shadows, then Glow.</div>

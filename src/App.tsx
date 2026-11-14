@@ -17,7 +17,7 @@ import { ShipyardUI } from './ui/Shipyard';
 import { LobbyScreen } from './ui/Lobby';
 import { TutorialCard } from './ui/TutorialCard';
 import { Toast } from './ui/Toast';
-import { useGame, useUI, useSettings, setScreen } from './store';
+import { useGame, useUI, useSettings, setScreen, showToast } from './store';
 import { syncSim, onLog, setScreenAudio, startAmbientSafe } from './audio';
 import { loadAssetManifest } from './world/parts';
 
@@ -106,6 +106,9 @@ export default function App() {
         dpr={[1, 1.5]}
         camera={{ fov: screen === 'game' ? 72 : 50, near: 0.05, far: 900, position: [0, 1.65, -2] }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
+        onCreated={({ gl }) => {
+          gl.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); showToast('3D graphics were lost. Reload the page (Cmd+R).'); });
+        }}
       >
         <color attach="background" args={['#02040a']} />
         <World />

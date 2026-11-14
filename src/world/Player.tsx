@@ -211,7 +211,8 @@ function Astronaut({ id }: { id: string }) {
   const color = ROLE_COLOR[p?.role ?? ''] ?? '#e2e8f0';
   const quality = useSettings((q) => q.quality);
   const flip = useSettings((q) => q.suitFlip);
-  const useSuit = quality !== 'low';
+  const crewSuit = useSettings((q) => q.crewSuit);
+  const useSuit = quality !== 'low' && crewSuit;
   suitOn.current = useSuit;
   const simple = (
     <group>
@@ -242,5 +243,9 @@ export function RemotePlayers() {
   const room = useNet((s) => s.room);
   const myId = useNet((s) => s.myId);
   if (!room) return null;
-  return <>{room.players.filter((p) => p.id !== myId).map((p) => <Astronaut key={p.id} id={p.id} />)}</>;
+  return (
+    <Safe fallback={null}>
+      {room.players.filter((p) => p.id !== myId).map((p) => <Astronaut key={p.id} id={p.id} />)}
+    </Safe>
+  );
 }

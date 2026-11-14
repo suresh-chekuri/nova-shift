@@ -42,9 +42,9 @@ export function closePanel() {
 // ---------------------------------------------------------------- settings
 export type Quality = 'low' | 'medium' | 'high';
 // `volume` is the MASTER volume (kept under the old name so old saves still work)
-interface Settings { suitFlip: boolean; perf: number; volume: number; ambientVol: number; sfxVol: number; musicVol: number; muted: boolean; sensitivity: number; bloom: boolean; shadows: boolean; quality: Quality }
+interface Settings { crewSuit: boolean; suitFlip: boolean; perf: number; volume: number; ambientVol: number; sfxVol: number; musicVol: number; muted: boolean; sensitivity: number; bloom: boolean; shadows: boolean; quality: Quality }
 function loadSettings(): Settings {
-  const d: Settings = { suitFlip: false, perf: 31, volume: 0.7, ambientVol: 0.7, sfxVol: 0.8, musicVol: 0.5, muted: false, sensitivity: 1, bloom: false, shadows: false, quality: 'medium' };
+  const d: Settings = { crewSuit: false, suitFlip: false, perf: 31, volume: 0.7, ambientVol: 0.7, sfxVol: 0.8, musicVol: 0.5, muted: false, sensitivity: 1, bloom: false, shadows: false, quality: 'medium' };
   try {
     const saved = JSON.parse(localStorage.getItem('nova-settings') || '{}');
     // V3.1 speed-up: shadows and glow start OFF once (they cost the most). You can turn them on again in Settings.
