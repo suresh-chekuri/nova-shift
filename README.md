@@ -79,3 +79,8 @@ If a role is empty, anyone can do that job. The host runs the mission; other pla
 - `npm run test:rooms` — multiplayer rooms
 - `npm run test:layout` — every room and console can be reached
 - audio test: `npx tsx scripts/audio-test.ts` (uses a fake sound card; no speakers needed)
+
+## Multiplayer notes
+- The host runs the mission. If the host's browser tab is hidden, a timer keeps the mission running for the other players.
+- If the host leaves, the room closes for everyone. There is no reconnect: if your internet drops, join a new room.
+- The server ignores bad messages instead of crashing, and it waits up to 60 seconds for a slow tab to answer.

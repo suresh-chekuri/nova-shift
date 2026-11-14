@@ -18,8 +18,8 @@ export function CommsPanel() {
 
   let hint = '';
   if (online && !g.commsLinked) {
-    const daz = Math.abs(az - g.target.az), del = Math.abs(el - g.target.el);
-    hint = strength === 0 ? 'Signal is too weak. Keep moving the antenna.' : daz > del ? 'Hint: adjust AZIMUTH (left / right).' : 'Hint: adjust ELEVATION (up / down).';
+    const daz = Math.abs(az - g.target.az), dEl = Math.abs(el - g.target.el);
+    hint = strength === 0 ? 'Signal is too weak. Keep moving the antenna.' : daz > dEl ? 'Hint: adjust AZIMUTH (left / right).' : 'Hint: adjust ELEVATION (up / down).';
   }
 
   const bars = Array.from({ length: 28 }, (_, i) => {

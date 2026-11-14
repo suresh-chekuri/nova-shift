@@ -59,7 +59,7 @@ export function HUD() {
   const infoRecent = g.log.filter((l) => g.elapsed - l.t < 9 && l.level === 'info').slice(-1);
   const paused = !ui.locked && !ui.panel && net.mode === 'solo';
   const flash = g.elapsed - g.flashAt < 2.5;
-  const cap = g.genOutput + ((g.sw.bj1 || g.sw.bj2) && g.battery > 0 ? 30 : 0);
+  const cap = g.genOutput + ((g.sw.bj1 || g.sw.bj2) && g.battery > 0 ? g.stats.battOutput : 0);
 
   return (
     <div className="hud">

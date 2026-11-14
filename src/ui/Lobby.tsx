@@ -51,8 +51,16 @@ export function LobbyScreen() {
             </div>
             {net.error && <div className="callout danger">{net.error}</div>}
             <div className="tip">
-              <b>Playing on different computers?</b> The host starts the game with <code>npm run dev</code>. Friends on the same Wi-Fi open
-              <code> http://HOST-IP:5173</code> (the host's IP address) in their browser.
+              {import.meta.env.DEV ? (
+                <>
+                  <b>Playing on different computers?</b> The host starts the game with <code>npm run dev</code>. Friends on the same Wi-Fi open
+                  <code> http://HOST-IP:5173</code> (the host's IP address) in their browser.
+                </>
+              ) : (
+                <>
+                  <b>Playing with friends?</b> Send them this link: <code>{window.location.origin}</code>. One person hosts, the others join with the 4-letter code.
+                </>
+              )}
             </div>
           </>
         )}
@@ -99,7 +107,7 @@ export function LobbyScreen() {
               {isHost && <button className="btn primary huge" disabled={!allReady || !isValid(design)} onClick={() => { sfx.launch(); startGame(); }}>START MISSION {!allReady ? '(waiting for ready)' : ''}</button>}
               <button className="btn" onClick={back}><LogOut size={14} /> LEAVE</button>
             </div>
-            <div className="tiny">Roles are unique. If a role is empty, anyone can do that job. Friends on the same Wi-Fi can join at http://{host}:5173</div>
+            <div className="tiny">Roles are unique. If a role is empty, anyone can do that job. {import.meta.env.DEV ? <>Friends on the same Wi-Fi can join at http://{host}:5173</> : <>Friends can join at {window.location.origin}</>}</div>
           </>
         )}
         {!room && <button className="btn huge" onClick={back}>BACK</button>}

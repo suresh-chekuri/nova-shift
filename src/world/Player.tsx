@@ -2,7 +2,7 @@ import { Suspense, useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
-import { useGame, useUI, useNet, useSettings, openPanel, closePanel, netHooks } from '../store';
+import { useGame, useUI, useNet, useSettings, openPanel, closePanel, netHooks, hostCatchUp } from '../store';
 import { useTut } from '../tutorial';
 import { updateListener } from '../audio';
 import { COLLIDERS, INTERACTABLES, roomAt } from './layout';
@@ -159,7 +159,23 @@ export function Player() {
 // Solo: pauses when the mouse is free. Multiplayer: the host never pauses. Clients only listen.
 export function GameLoop() {
   const acc = useRef(0);
+  const lastRun = useRef(performance.now());
+  // Host only: if this browser tab is hidden, frames stop. A timer keeps the mission running for the other players.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (!document.hidden) return;
+      const net = useNet.getState();
+      if (net.mode !== 'host' || useGame.getState().phase !== 'playing') { lastRun.current = performance.now(); return; }
+      const now = performance.now();
+      const seconds = (now - lastRun.current) / 1000;
+      if (seconds < 0.1) return;
+      lastRun.current = now - ((seconds * 1000) % 100); // keep the leftover part of a step
+      hostCatchUp(seconds);
+    }, 250);
+    return () => window.clearInterval(id);
+  }, []);
   useFrame((_, delta) => {
+    lastRun.current = performance.now();
     const g = useGame.getState();
     const ui = useUI.getState();
     const net = useNet.getState();

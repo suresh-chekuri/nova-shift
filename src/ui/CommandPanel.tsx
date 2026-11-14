@@ -3,7 +3,7 @@ import { useGame, useNet, myRole } from '../store';
 import { Frame } from './Frame';
 import { fmtTime } from './HUD';
 import { getMission } from '../design';
-import { objectiveTexts, SYSTEMS, SYS_IDS, nextGoal, sumData, DATA_GOAL } from '../sim';
+import { MISSION_SECONDS, objectiveTexts, SYSTEMS, SYS_IDS, nextGoal, sumData, DATA_GOAL } from '../sim';
 
 const ORDERS = ['Restart the generator!', 'Route power to Life Support first.', 'Align the antenna to Earth.', 'Start the Signal Analyzer.', 'Cut non-essential load!', 'Transmit the data now.'];
 
@@ -56,7 +56,7 @@ export function CommandPanel() {
       <div className="subhead"><Cpu size={14} /> SHIP LOG</div>
       <div className="log">
         {[...g.log].reverse().slice(0, 9).map((l) => (
-          <div key={l.id} className={'log-line ' + l.level}>[{fmtTime(600 - l.t)}] {l.text}</div>
+          <div key={l.id} className={'log-line ' + l.level}>[{fmtTime(MISSION_SECONDS - l.t)}] {l.text}</div>
         ))}
       </div>
     </Frame>

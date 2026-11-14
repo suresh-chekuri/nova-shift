@@ -247,9 +247,14 @@ export const ACTION_ROLES: Record<string, Role[]> = {
 };
 export const ROLE_NAME: Record<Role, string> = { commander: 'COMMANDER', engineer: 'ENGINEER', science: 'SCIENCE OFFICER', comms: 'COMMUNICATIONS OFFICER' };
 
+// Which roles may do an action. Used by allowed() AND by the "Only the ..." message, so they always agree.
+export function rolesFor(name: string, args: any[]): Role[] | undefined {
+  if (name === 'toggleSwitch') return args[0] === 'eng' ? ['engineer', 'commander'] : ['engineer'];
+  return ACTION_ROLES[name];
+}
+
 export function allowed(name: string, args: any[], actor: Role | null, players: PlayerInfo[]): boolean {
-  let roles = ACTION_ROLES[name];
-  if (name === 'toggleSwitch') roles = args[0] === 'eng' ? ['engineer', 'commander'] : ['engineer'];
+  const roles = rolesFor(name, args);
   if (!roles || players.length === 0) return true;
   if (actor && roles.includes(actor)) return true;
   // if nobody holds any of the needed roles, anyone may act
@@ -271,7 +276,7 @@ type Actions = {
   repairAntenna: () => void;
   toggleTransmit: () => void;
   order: (text: string) => void;
-  step: (dt: number) => void;
+  step: (dt: number, broadcast?: boolean) => void;
 };
 export type Store = sim.GameState & Actions;
 
@@ -304,7 +309,7 @@ function act(name: string, args: any[]) {
   const role = myRole();
   if (!allowed(name, args, role, players)) {
     sfx.warn();
-    const need = (name === 'toggleSwitch' ? ['engineer'] : ACTION_ROLES[name]).map((r) => ROLE_NAME[r as Role]).join(' / ');
+    const need = (rolesFor(name, args) ?? []).map((r) => ROLE_NAME[r]).join(' / ');
     showToast('Only the ' + need + ' can do this.');
     return;
   }
@@ -332,15 +337,26 @@ export const useGame = create<Store>()(() => ({
   repairAntenna: () => act('repairAntenna', []),
   toggleTransmit: () => act('toggleTransmit', []),
   order: (text) => act('order', [text]),
-  step: (dt) => {
+  step: (dt, broadcast = true) => {
     const ui = useUI.getState();
     const net = useNet.getState();
     const remoteComms = (Object.values(net.remote) as { panel: string | null; t: number }[]).some((r) => r.panel === 'comms' && Date.now() - r.t < 2000);
     const ctx = { commsOpen: ui.panel === 'comms' || remoteComms };
     mutate((g) => sim.tick(g, dt, Math.random, ctx));
-    if (net.mode === 'host') netHooks.sendState(sim.cloneData(useGame.getState()));
+    if (net.mode === 'host' && broadcast) netHooks.sendState(sim.cloneData(useGame.getState()));
   },
 }));
+
+// A browser tab in the background stops drawing frames, so the game loop would freeze for everyone.
+// The host calls this from a timer to catch up, so friends keep playing while the host looks at another window.
+export function hostCatchUp(seconds: number) {
+  const steps = Math.floor(Math.min(seconds, 30) / 0.1);
+  for (let i = 0; i < steps; i++) {
+    if (useGame.getState().phase !== 'playing') break;
+    useGame.getState().step(0.1, false);
+  }
+  if (steps > 0 && useNet.getState().mode === 'host') netHooks.sendState(sim.cloneData(useGame.getState()));
+}
 
 // ---------------------------------------------------------------- flow
 export function launch(mode: 'mission' | 'tutorial' = 'mission', design?: Design) {

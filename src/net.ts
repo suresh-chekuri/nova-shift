@@ -22,7 +22,11 @@ function ensure(): Socket {
     if (useNet.getState().mode !== 'solo') leaveLocal('Connection to the server was lost.');
   });
   s.on('connect_error', () => {
-    useNet.setState({ error: 'Cannot reach the game server. Start the game with "npm run dev" on the host computer.' });
+    useNet.setState({
+      error: import.meta.env.DEV
+        ? 'Cannot reach the game server. Start the game with "npm run dev" on the host computer.'
+        : 'Cannot reach the game server. If the site was asleep, wait 30 seconds and try again.',
+    });
     s.close();
     socket = null;
   });
@@ -32,6 +36,8 @@ function ensure(): Socket {
   s.on('game:state', (state) => {
     if (useNet.getState().mode === 'client') useGame.setState(state);
   });
+  // Positions arrive 10 times a second. Nothing subscribes to `remote` (the 3D players read it every frame),
+  // so we write to it directly on purpose. This avoids re-rendering React on every message.
   s.on('player:pos', (p) => {
     useNet.getState().remote[p.id] = { x: p.x, z: p.z, yaw: p.yaw, panel: p.panel ?? null, t: Date.now() };
   });
