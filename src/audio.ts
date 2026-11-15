@@ -591,7 +591,7 @@ function scheduleBell() {
   const wait = (musicMode === 'menu' ? 5000 : 11000) + Math.random() * 9000;
   bellTimer = window.setTimeout(() => {
     if (ctx && ctx.state === 'running' && musicMode !== 'off') {
-      bell(BELL_NOTES[Math.floor(Math.random() * BELL_NOTES.length)], musicMode === 'menu' ? 0.05 : 0.03);
+      bell(BELL_NOTES[Math.floor(Math.random() * BELL_NOTES.length)], musicMode === 'menu' ? 0.045 : 0.02);
     }
     scheduleBell();
   }, wait);
@@ -608,7 +608,9 @@ export function setMusic(mode: 'menu' | 'game' | 'off') {
     const tone1 = filt('lowpass', 3200, 0.4);          // keeps the top soft
     const dry = c.createGain(); dry.gain.value = 0.75;
     const wet = c.createGain(); wet.gain.value = 0.55;
-    musIn.connect(tone1); tone1.connect(dry).connect(musGain);
+    // slow swell: the music rises and falls over ~40 s, so it never feels like it is constantly playing
+    const swell = c.createGain(); swell.gain.value = 0.62; lfo(0.025, 0.32, swell.gain);
+    musIn.connect(swell); swell.connect(tone1); tone1.connect(dry).connect(musGain);
     if (c.createConvolver) { const verb = c.createConvolver(); verb.buffer = makeImpulse(c); tone1.connect(verb).connect(wet).connect(musGain); } // no reverb if the browser lacks it
 
     // drone: root + fifth, slowly breathing
@@ -643,7 +645,7 @@ export function setMusic(mode: 'menu' | 'game' | 'off') {
     scheduleBell();
   }
   if (mode !== 'off' && !bellTimer) scheduleBell();
-  musGain!.gain.setTargetAtTime(mode === 'menu' ? 0.9 : mode === 'game' ? 0.35 : 0, c.currentTime, 2);
+  musGain!.gain.setTargetAtTime(mode === 'menu' ? 0.7 : mode === 'game' ? 0.16 : 0, c.currentTime, 2);  // in the game the music stays under the ship ambience
 }
 
 // ------------------------------------------------------------ 3D listener + room tracking
