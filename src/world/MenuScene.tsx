@@ -3,7 +3,8 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { SpacecraftModel } from './ShipModel';
-import { Moon, Earth } from './space';
+import { Earth } from './space';
+import { CustomMenuMoon } from './MoonModel';
 import { Starfield } from './deepspace';
 import { EnvRig } from './EnvRig';
 import { useDesign, useUI } from '../store';
@@ -43,7 +44,7 @@ export function MenuScene() {
       <directionalLight ref={sun} intensity={3.2} color="#fff4e0" />
       <pointLight position={[0, -3, -6]} intensity={30} color="#f97316" distance={14} />
       <Starfield count={6000} />
-      <Moon radius={80} position={[0, -86, 10]} />
+      <CustomMenuMoon radius={80} position={[0, -86, 10]} />
       <Earth radius={14} position={[-110, 45, -190]} />
       <group ref={ship}>
         <SpacecraftModel design={design} />
