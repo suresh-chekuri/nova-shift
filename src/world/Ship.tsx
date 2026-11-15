@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { DeepSpace } from './deepspace';
-import { CustomWindowMoon } from './MoonModel';
+import { WindowMoon } from './space';
 import * as THREE from 'three';
 import { useGame, useSettings, useUI } from '../store';
 import { isEmergency, nextGoal, type GameState, type InstrId } from '../sim';
@@ -441,12 +441,12 @@ function Lights() {
 // ---------- Outside ----------
 function Outside() {
   // sun is low in the east. These are the directions from each planet to the sun (used to paint the light on them).
-  const moonSun = useMemo(() => ({ dir: [270, 14, -75] as [number, number, number], rotY: Math.PI }), []);
+  const moonSun = useMemo(() => ({ dir: [270, 14, -75] as [number, number, number], rotY: Math.PI / 2 }), []);
   const earthSun = useMemo(() => ({ dir: [270, 8, 140] as [number, number, number], rotY: 0 }), []);
   return (
     <>
       <DeepSpace />
-      <CustomWindowMoon radius={30} position={[0, 8, 95]} sun={moonSun} />
+      <WindowMoon radius={30} position={[0, 8, 95]} sun={moonSun} />
       {/* a nearby piece of lunar horizon below the Command Deck window */}
       <WindowHorizon radius={160} position={[0, -150, 60]} />
       {/* the Sun: low in the east, seen through the Science Lab window. Hard white, no atmosphere. */}

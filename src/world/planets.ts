@@ -103,72 +103,196 @@ function bakeSun(c: HTMLCanvasElement, sun: Sun, ambient: number, relief?: HTMLC
 }
 
 // =============================================================== MOON
+// Made to look like the real Moon seen from Earth:
+//  * grey highlands and dark "seas" (maria) in the real places (Imbrium, Serenitatis, Crisium, Tranquillitatis ...),
+//  * ring walls around the big basins, wrinkle ridges in the seas,
+//  * many craters with raised rims, flat floors and central peaks (a power-law mix of sizes),
+//  * bright young craters with long rays (Tycho, Copernicus, Kepler, Aristarchus),
+//  * the far side is almost all highlands, like the real thing.
+// Map layout: the middle of the picture is the near side (longitude 0). East is to the right. North is at the top.
+interface Mare { lon: number; lat: number; rx: number; ry: number; k: number }
+const MARIA: Mare[] = [
+  { lon: -16, lat: 34, rx: 17, ry: 14, k: 1.0 },    // Imbrium
+  { lon: 18, lat: 28, rx: 9, ry: 8, k: 1.0 },       // Serenitatis
+  { lon: 31, lat: 8, rx: 12, ry: 9, k: 0.95 },      // Tranquillitatis
+  { lon: 52, lat: -5, rx: 9, ry: 10, k: 0.85 },     // Fecunditatis
+  { lon: 59, lat: 17, rx: 6, ry: 5, k: 1.0 },       // Crisium
+  { lon: 34, lat: -15, rx: 5, ry: 5, k: 0.9 },      // Nectaris
+  { lon: -55, lat: 18, rx: 24, ry: 24, k: 0.82 },   // Oceanus Procellarum
+  { lon: -16, lat: -21, rx: 9, ry: 7, k: 0.9 },     // Nubium
+  { lon: -39, lat: -24, rx: 6, ry: 6, k: 0.95 },    // Humorum
+  { lon: -23, lat: -9, rx: 6, ry: 5, k: 0.85 },     // Cognitum
+  { lon: 3, lat: 13, rx: 6, ry: 5, k: 0.9 },        // Vaporum
+  { lon: -20, lat: 8, rx: 8, ry: 6, k: 0.88 },      // Insularum
+  { lon: -48, lat: 36, rx: 12, ry: 10, k: 0.8 },    // Procellarum north
+  { lon: -62, lat: -8, rx: 10, ry: 14, k: 0.78 },   // Procellarum south
+  { lon: 10, lat: 40, rx: 10, ry: 6, k: 0.8 },      // Lacus / Serenitatis link
+  { lon: 0, lat: 59, rx: 22, ry: 4, k: 0.7 },       // Frigoris
+  { lon: 87, lat: 2, rx: 4, ry: 3, k: 0.7 },        // Smythii
+  { lon: -93, lat: -19, rx: 4, ry: 4, k: 0.8 },     // Orientale (far-side edge)
+  { lon: 129, lat: 20, rx: 4, ry: 3, k: 0.6 },      // far-side small seas
+  { lon: 147, lat: -20, rx: 3, ry: 3, k: 0.65 },    // Tsiolkovskiy
+  { lon: 148, lat: 28, rx: 3, ry: 3, k: 0.55 },     // Moscoviense
+];
+// Ring basins (wall only, the sea floor inside is flooded): lon, lat, radius in degrees
+const BASINS = [
+  [-16, 34, 17], [18, 28, 9.5], [59, 17, 7], [34, -15, 5.5], [-39, -24, 6.5], [-93, -19, 8], [-93, -19, 4.5], [-16, -21, 9],
+];
+// Young bright craters with rays: lon, lat, radius deg, ray length deg
+const RAYED = [
+  [-11, -43, 1.7, 42], [-20, 9.7, 1.3, 20], [-38, 8, 0.9, 12], [-47, 23.7, 0.8, 9], [-9, 49, 0.7, 7], [-68, -3, 0.9, 12],
+];
+
 export function moonMaps(w: number, sun?: Sun) {
   const h = w / 2;
   const color = canvas(w, h), bump = canvas(w, h);
   const cc = color.getContext('2d')!, bc = bump.getContext('2d')!;
   const ci = cc.createImageData(w, h), bi = bc.createImageData(w, h);
+  const ppd = w / 360;                      // pixels per degree
+  const scale = w / 1024;
+  const H = new Float32Array(w * h);        // height (craters add to it)
+  const A = new Float32Array(w * h);        // brightness added by young craters
+  const M = new Float32Array(w * h);        // how much "sea" (0 highland .. 1 sea)
   const n = [0, 0, 0];
+  const lonOf = (px: number) => ((px + 0.5) / w - 0.5) * 360;
+  const latOf = (py: number) => 90 - ((py + 0.5) / h) * 180;
+  const dlon = (a: number, b: number) => { let d = a - b; if (d > 180) d -= 360; if (d < -180) d += 360; return d; };
+
+  // ---- 1. seas (and how deep the highland relief is)
+  const base = new Float32Array(w * h);
+  for (let py = 0; py < h; py++) {
+    const lat = latOf(py), cl = Math.max(0.15, Math.cos((lat * Math.PI) / 180));
+    for (let px = 0; px < w; px++) {
+      const lon = lonOf(px);
+      spherePoint(px, py, w, h, n);
+      const wob = fbm(n[0] * 4 + 9, n[1] * 4, n[2] * 4, 4, 31);    // ragged coastlines
+      const wob2 = fbm(n[0] * 11, n[1] * 11 + 5, n[2] * 11, 3, 41);
+      let m = 0;
+      for (let k = 0; k < MARIA.length; k++) {
+        const s = MARIA[k];
+        const dx = (dlon(lon, s.lon) * cl) / (s.rx * 1.3), dy = (lat - s.lat) / (s.ry * 1.3);
+        const d = Math.sqrt(dx * dx + dy * dy) + (wob - 0.5) * 0.85 + (wob2 - 0.5) * 0.3;
+        const v = (1 - smooth(0.7, 1.1, d)) * s.k;
+        if (v > m) m = v;
+      }
+      const i = py * w + px;
+      M[i] = m;
+      base[i] = fbm(n[0] * 3, n[1] * 3, n[2] * 3, 5, 61);
+    }
+  }
+
+  // ---- 2. craters (height field)
+  const rand = rng(777);
+  const addCrater = (cx: number, cy: number, r: number, o: { basin?: boolean; fresh?: number; peak?: boolean; age?: number } = {}) => {
+    const age = o.age ?? 1;                               // 1 = sharp and young, small = worn down
+    const lat = 90 - (cy / h) * 180;
+    const cl = Math.max(0.12, Math.cos((lat * Math.PI) / 180));
+    const reach = r * (o.fresh ? 3.2 : 2.6);
+    const D = o.basin ? 0 : (0.12 + 0.11 * Math.min(1, r / (16 * scale))) * (0.35 + 0.65 * age);
+    const R = o.basin ? 0.2 : D * (0.3 + 0.35 * age);
+    const y0 = Math.max(0, Math.floor(cy - reach)), y1 = Math.min(h - 1, Math.ceil(cy + reach));
+    const xr = Math.ceil(reach / cl);
+    for (let py = y0; py <= y1; py++) {
+      const dy = (py + 0.5 - cy);
+      for (let xx = -xr; xx <= xr; xx++) {
+        const dx = xx * cl;
+        const d = Math.sqrt(dx * dx + dy * dy) / r;
+        if (d > reach / r) continue;
+        const px = (((Math.floor(cx) + xx) % w) + w) % w;
+        let hh = 0;
+        if (d < 1) {
+          if (!o.basin) {
+            hh -= D * (1 - d * d);
+            if (r > 12 * scale) hh = Math.max(hh, -D * 0.72);        // flat floor in large craters
+            if (o.peak !== false && r > 15 * scale) hh += D * 0.4 * Math.exp(-Math.pow(d / 0.13, 2));
+          }
+          hh += R * Math.exp(-Math.pow((d - 1) / 0.17, 2)) * (d > 0.75 ? 1 : 0);
+        } else {
+          hh += R * Math.exp(-Math.pow((d - 1) / 0.17, 2));
+          hh += R * 0.1 * Math.pow(d, -3);                        // blanket of thrown-out rock
+        }
+        const i = py * w + px;
+        H[i] += hh;
+        if (o.fresh) A[i] += o.fresh * (d < 1 ? 0.5 : 0.7 * Math.pow(Math.max(0, 1 - (d - 1) / 2.2), 1.6)) * (0.8 + 0.4 * rand());
+      }
+    }
+  };
+  const px2 = (lon: number) => (lon / 360 + 0.5) * w, py2 = (lat: number) => (0.5 - lat / 180) * h;
+  // basins first (oldest)
+  BASINS.forEach(([lo, la, rd]) => addCrater(px2(lo), py2(la), rd * ppd, { basin: true }));
+  // random craters: many small, few large (power law). Old ones are shallow; seas have fewer.
+  const count = Math.round((w * h) / 190);
+  const rmin = 0.85 * scale;
+  const list: [number, number, number][] = [];
+  for (let i = 0; i < count; i++) {
+    const r = Math.min(48 * scale, rmin / Math.pow(1 - rand() * 0.9995, 1 / 1.35));
+    const x = rand() * w, y = rand() * h;
+    list.push([x, y, r]);
+  }
+  list.sort((a, b) => b[2] - a[2]);                              // big (old) first, small on top
+  for (const [x, y, r] of list) {
+    const m = M[Math.min(h - 1, Math.floor(y)) * w + Math.min(w - 1, Math.floor(x))];
+    if (m > 0.5 && r < 9 * scale && rand() < 0.75) continue;     // the seas are younger: fewer small craters
+    const fresh = r > 3 * scale && rand() < 0.07 ? 0.18 : 0;
+    addCrater(x, y, r, { fresh, age: fresh ? 1 : Math.pow(rand(), 0.8) });
+  }
+  // the famous bright craters
+  RAYED.forEach(([lo, la, rd], i) => addCrater(px2(lo), py2(la), Math.max(2.5, rd * ppd), { fresh: i === 0 ? 0.5 : 0.4, peak: true }));
+
+  // ---- 3. final colours and height picture
+  const rays = RAYED.map(([lo, la, rd, len], i) => {
+    const phi = (lo / 360 + 0.5) * Math.PI * 2, th = (0.5 - la / 180) * Math.PI;
+    return { x: -Math.cos(phi) * Math.sin(th), y: Math.cos(th), z: Math.sin(phi) * Math.sin(th), len: (len * Math.PI) / 180, rd: (rd * Math.PI) / 180, s: i * 13 + 5, k: i === 0 ? 1 : 0.7 };
+  });
   for (let py = 0; py < h; py++) {
     for (let px = 0; px < w; px++) {
       spherePoint(px, py, w, h, n);
-      const x = n[0], y = n[1], z = n[2];
-      // dark lava plains (the "seas"), mostly away from the poles
-      const sea = fbm(x * 1.5 + 3.1, y * 1.5 + 1.7, z * 1.5 + 5.3, 4, 11);
-      const mare = smooth(0.5, 0.6, sea) * (1 - smooth(0.6, 0.92, Math.abs(y)));
-      const detail = fbm(x * 9, y * 9, z * 9, 4, 23);
-      const grain = noise3(x * 90, y * 90, z * 90, 5);
-      const hi = 0.6 + 0.16 * (detail - 0.5) + 0.05 * (grain - 0.5);
-      const lo = 0.3 + 0.1 * (detail - 0.5) + 0.04 * (grain - 0.5);
-      const v = mix(hi, lo, mare);
-      const i = (py * w + px) * 4;
-      // grey with a slight warm tint on the highlands and a cool tint on the plains
-      ci.data[i] = 255 * v * mix(1.0, 0.93, mare);
-      ci.data[i + 1] = 255 * v * mix(0.99, 0.96, mare);
-      ci.data[i + 2] = 255 * v * mix(0.96, 1.0, mare);
-      ci.data[i + 3] = 255;
-      // bumps: rough highlands, smooth plains
-      const hgt = 0.5 + (detail - 0.5) * mix(0.34, 0.1, mare) + (grain - 0.5) * 0.05;
-      const g = 255 * clamp01(hgt);
-      bi.data[i] = bi.data[i + 1] = bi.data[i + 2] = g; bi.data[i + 3] = 255;
+      const i = py * w + px;
+      const m = M[i];
+      const detail = fbm(n[0] * 14, n[1] * 14, n[2] * 14, 4, 23);
+      const grain = noise3(n[0] * 160, n[1] * 160, n[2] * 160, 5);
+      const patch = base[i];
+      // albedo
+      let hi = 0.6 + 0.2 * (patch - 0.5) + 0.12 * (detail - 0.5) + 0.05 * (grain - 0.5);
+      let lo = 0.26 + 0.12 * (patch - 0.5) + 0.05 * (detail - 0.5) + 0.03 * (grain - 0.5);
+      // sea tint: some bluish (Tranquillitatis), some brownish (Procellarum)
+      const tint = fbm(n[0] * 2 + 7, n[1] * 2, n[2] * 2, 2, 71) - 0.5;
+      let r = mix(hi * 1.0, lo * (1.0 - tint * 0.35), m), g = mix(hi * 0.985, lo * 0.975, m), b = mix(hi * 0.95, lo * (1.0 + tint * 0.5), m);
+      let bright = A[i];
+      // rays (angle from the crater, with streaks that depend on direction)
+      for (let q = 0; q < rays.length; q++) {
+        const c = rays[q];
+        const dot = n[0] * c.x + n[1] * c.y + n[2] * c.z;
+        if (dot < 0.2) continue;
+        const ang = Math.acos(Math.min(1, dot));
+        if (ang > c.len || ang < c.rd) continue;
+        // direction around the crater: a stable number from the position difference
+        // east/north directions at the crater, then the angle around it
+        let e1x = c.z, e1y = 0, e1z = -c.x; const el = Math.hypot(e1x, e1z) || 1; e1x /= el; e1z /= el;
+        const e2x = c.y * e1z - c.z * e1y, e2y = c.z * e1x - c.x * e1z, e2z = c.x * e1y - c.y * e1x;
+        const az = Math.atan2(n[0] * e2x + n[1] * e2y + n[2] * e2z, n[0] * e1x + n[1] * e1y + n[2] * e1z);
+        const streak = Math.pow(Math.max(0, noise3(Math.cos(az) * 2.4 + c.s, Math.sin(az) * 2.4, c.s, 3) - 0.42) * 2.6, 1.2);
+        const fall = Math.pow(1 - (ang - c.rd) / (c.len - c.rd), 1.4);
+        bright += streak * fall * 0.3 * c.k * (0.5 + 0.5 * noise3(n[0] * 40, n[1] * 40, n[2] * 40, c.s));
+      }
+      // shading hint from crater height: floors a little darker, rims brighter
+      const hh = H[i];
+      bright += Math.max(0, hh) * 0.1 - Math.max(0, -hh) * 0.1;
+      const f = 1 + bright * 1.5;
+      const o = i * 4;
+      ci.data[o] = Math.min(255, 255 * r * f);
+      ci.data[o + 1] = Math.min(255, 255 * g * f);
+      ci.data[o + 2] = Math.min(255, 255 * b * f);
+      ci.data[o + 3] = 255;
+      // relief: rough highlands, smooth seas with wrinkle ridges
+      const ridge = 1 - Math.abs(2 * fbm(n[0] * 7 + 2, n[1] * 7, n[2] * 7, 3, 83) - 1);
+      const rel = (detail - 0.5) * mix(0.22, 0.05, m) + (patch - 0.5) * 0.12 + Math.pow(ridge, 6) * 0.06 * m + (grain - 0.5) * 0.035 + hh;
+      const gv = 255 * clamp01(0.5 + rel);
+      bi.data[o] = bi.data[o + 1] = bi.data[o + 2] = gv; bi.data[o + 3] = 255;
     }
   }
   cc.putImageData(ci, 0, 0);
   bc.putImageData(bi, 0, 0);
-
-  // craters: many small ones and a few big ones
-  const rand = rng(777);
-  const count = Math.round((w * h) / 650);
-  const scale = w / 1024;
-  const drawCrater = (x: number, y: number, r: number, fresh: boolean, age: number) => {
-    if (fresh) {
-      // bright splash of dust around young craters
-      const gl = cc.createRadialGradient(x, y, r, x, y, r * 2.8);
-      gl.addColorStop(0, 'rgba(240,240,235,0.26)'); gl.addColorStop(1, 'rgba(240,240,235,0)');
-      cc.fillStyle = gl; cc.beginPath(); cc.arc(x, y, r * 2.8, 0, 7); cc.fill();
-    }
-    // the floor is a little darker. Most of the shape comes from the bump picture.
-    const gc = cc.createRadialGradient(x, y, 0, x, y, r);
-    gc.addColorStop(0, 'rgba(40,40,44,0.16)'); gc.addColorStop(0.8, 'rgba(45,45,50,0.07)'); gc.addColorStop(1, 'rgba(45,45,50,0)');
-    cc.fillStyle = gc; cc.beginPath(); cc.arc(x, y, r, 0, 7); cc.fill();
-    // height: bowl inside, raised rim, then back to the ground. Small craters are shallow.
-    const depth = Math.min(1, 0.45 + r / (24 * scale)) * (0.4 + 0.6 * age);
-    const lo = Math.round(128 - 80 * depth), mid = Math.round(128 - 42 * depth), rim = Math.round(128 + 80 * Math.min(1, depth + 0.1));
-    const gb = bc.createRadialGradient(x, y, 0, x, y, r * 1.2);
-    gb.addColorStop(0, `rgba(${lo},${lo},${lo},0.95)`); gb.addColorStop(0.55, `rgba(${mid},${mid},${mid},0.9)`);
-    gb.addColorStop(0.8, `rgba(${rim},${rim},${rim},0.95)`); gb.addColorStop(0.92, `rgba(150,150,150,0.55)`); gb.addColorStop(1, 'rgba(128,128,128,0)');
-    bc.fillStyle = gb; bc.beginPath(); bc.arc(x, y, r * 1.2, 0, 7); bc.fill();
-  };
-  for (let i = 0; i < count; i++) {
-    const x = rand() * w, y = rand() * h;
-    // craters near the poles are stretched on the sphere picture, so make them narrower there
-    const r = (1 + Math.pow(rand(), 4.2) * 40) * scale;
-    const fresh = r > 7 * scale && rand() < 0.3;
-    const age = rand();
-    drawCrater(x, y, r, fresh, age);
-    if (x < r * 2.6) drawCrater(x + w, y, r, fresh, age);
-    if (x > w - r * 2.6) drawCrater(x - w, y, r, fresh, age);
-  }
   if (sun) bakeSun(color, sun, 0.03, bump);
   return { color, bump };
 }

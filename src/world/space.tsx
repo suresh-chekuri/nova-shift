@@ -93,7 +93,7 @@ export function Atmosphere({ radius, color = '#5aa8ff', strength = 1 }: { radius
 // ---------------------------------------------------------------- lit Moon and Earth (menu, shipyard)
 export function Moon({ radius, position }: { radius: number; position: [number, number, number] }) {
   const quality = useSettings((s) => s.quality);
-  const size = planetSize(quality);
+  const size = Math.min(1536, planetSize(quality)); // the Moon picture is heavy to draw, so cap it
   const maps = useLater(() => cached('moon' + size, () => moonMaps(size)), [size]);
   const drawn = useMemo(() => (maps ? { map: canvasTex(maps.color), bump: canvasTex(maps.bump, false) } : null), [maps]);
   const realMap = useRealTexture('moon.jpg');
@@ -101,7 +101,7 @@ export function Moon({ radius, position }: { radius: number; position: [number, 
   const map = realMap ?? drawn?.map ?? null;
   const bump = realBump ?? (realMap ? null : drawn?.bump ?? null);
   return (
-    <mesh position={position}>
+    <mesh position={position} rotation={[0, 0, Math.PI / 2]}>
       <sphereGeometry args={[radius, 128, 96]} />
       <meshStandardMaterial
         key={(map ? 1 : 0) + (bump ? 2 : 0)}

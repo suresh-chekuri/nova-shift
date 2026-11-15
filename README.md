@@ -90,6 +90,6 @@ To use real NASA pictures, see `public/textures/README.md`.
 - Lighting is in `Lights()` in `src/world/Ship.tsx` (each room has its own tint; emergency lights turn warm red).
 
 ## Cinematic space and music
-- **Moon model:** put your GLB at `public/models/moon.glb` (steps in `public/models/README.md`). Without it, the built-in Moon is used.
+- **Moon:** drawn by code in `moonMaps` (`src/world/planets.ts`): real sea positions (Imbrium, Serenitatis, Crisium...), basin rings, thousands of craters, rayed craters like Tycho, and a nearly all-highland far side. The near side faces the ship windows.
 - **Space (all made by code):** `src/world/deepspace.tsx` — 7,000 stars (one draw call, fixed to the camera), Milky Way, soft nebulae, galaxies, a ringed planet, a red planet, asteroids, a satellite, a comet, debris. Quality LOW draws fewer stars and skips galaxies and the comet.
 - **Music:** `setMusic` in `src/audio.ts` — drone, pad, shimmer and sparse bells with reverb. No audio files. Volume sliders are in Settings.
