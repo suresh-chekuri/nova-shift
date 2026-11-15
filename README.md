@@ -93,3 +93,10 @@ To use real NASA pictures, see `public/textures/README.md`.
 - **Moon:** drawn by code in `moonMaps` (`src/world/planets.ts`): real sea positions (Imbrium, Serenitatis, Crisium...), basin rings, thousands of craters, rayed craters like Tycho, and a nearly all-highland far side. The near side faces the ship windows.
 - **Space (all made by code):** `src/world/deepspace.tsx` — 7,000 stars (one draw call, fixed to the camera), Milky Way, soft nebulae, galaxies, a ringed planet, a red planet, asteroids, a satellite, a comet, debris. Quality LOW draws fewer stars and skips galaxies and the comet.
 - **Music:** `setMusic` in `src/audio.ts` — drone, pad, shimmer and sparse bells with reverb. No audio files. Volume sliders are in Settings.
+
+## NASA data in the game
+- `src/nasa.ts` loads real data from the NASA Open APIs when the game starts: solar flares (DONKI), near-Earth asteroids (NeoWs) and the Astronomy Picture of the Day title. Results are cached for 3 hours. If the network or the key fails, clearly marked sample data is used and the game still works.
+- Where it shows: a ticker under the main display on the Command Deck, one data alert about 40 seconds into a mission, and a short "Did you know?" card the first time you enter each room (not in the tutorial). Nothing changes gameplay.
+- Key: create a free key at api.nasa.gov and set `VITE_NASA_API_KEY` (in Render: Environment, then rebuild). Without it the shared `DEMO_KEY` is used, which has a small limit.
+- Real Moon maps: see `public/textures/README.md`.
+- Test: `npm run test:nasa`.

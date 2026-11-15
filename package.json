@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:sim": "node --experimental-strip-types scripts/sim-test.ts",
-    "test:layout": "node --experimental-strip-types scripts/layout-test.ts"
+    "test:layout": "node --experimental-strip-types scripts/layout-test.ts",
+    "test:nasa": "npx tsx scripts/nasa-test.ts"
   },
   "dependencies": {
     "@react-three/drei": "^9.114.0",

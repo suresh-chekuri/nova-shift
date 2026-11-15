@@ -6,6 +6,7 @@ import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGame } from '../../store';
+import { useNasa, nasaLines } from '../../nasa';
 import { pose } from '../../controls';
 import type { GameState, InstrId } from '../../sim';
 import { Bx, Cy, Run, Inst, MAT, CYL, SPH, TOR, Led, LED, Plate, LiveScreen, SCR, mmss, shown, type V3, type Item, type Draw } from './kit';
@@ -513,10 +514,23 @@ const centralDraw: Draw = (c, W, Hh, g, t) => {
   c.fillStyle = g.battery > 25 ? SCR.green : SCR.red; c.fillRect(W * 0.7, Hh * 0.6, 242 * clamp01(g.battery / 100), 12);
   c.textAlign = 'left';
 };
+// a thin ticker under the main display: real NASA data (or clearly marked sample data), one line at a time
+const tickerDraw: Draw = (c, W, Hh, _g, t) => {
+  c.fillStyle = '#050c0b'; c.fillRect(0, 0, W, Hh);
+  const lines = nasaLines(useNasa.getState().data);
+  if (!lines.length) return;
+  const i = Math.floor(t / 7) % lines.length;
+  const fade = Math.min(1, ((t % 7) < 0.6 ? (t % 7) / 0.6 : 1));
+  c.globalAlpha = fade;
+  c.fillStyle = SCR.text; c.font = 'bold 13px monospace'; c.textBaseline = 'middle'; c.textAlign = 'left';
+  c.fillText(lines[i], 10, Hh / 2 + 1, W - 20);
+  c.globalAlpha = 1;
+};
 export function CentralDisplay() {
   return (
     <group>
       <LiveScreen p={[0, 3.38, 2.55]} rotY={PI} w={4.6} h={0.62} draw={centralDraw} fps={4} />
+      <LiveScreen p={[0, 2.98, 2.55]} rotY={PI} w={4.6} h={0.2} draw={tickerDraw} fps={4} minH={24} />
       {[-2.1, 2.1].map((x) => <Bx key={x} p={[x, 3.84, 2.55]} s={[0.05, 0.34, 0.05]} m={MAT.steel} />)}
       {[-2.1, 2.1].map((x) => <Bx key={'b' + x} p={[x, 3.68, 2.55]} s={[0.12, 0.04, 0.12]} m={MAT.darkSteel} />)}
     </group>

@@ -65,7 +65,7 @@ function spherePoint(px: number, py: number, w: number, h: number, out: number[]
 }
 
 /** Paint sun light into a finished picture. */
-function bakeSun(c: HTMLCanvasElement, sun: Sun, ambient: number, relief?: HTMLCanvasElement) {
+export function bakeSun(c: HTMLCanvasElement, sun: Sun, ambient: number, relief?: HTMLCanvasElement) {
   const w = c.width, h = c.height;
   const ctx = c.getContext('2d')!;
   const img = ctx.getImageData(0, 0, w, h);

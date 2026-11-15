@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useSettings } from '../store';
-import { moonMaps, earthMaps, cached, planetSize, type Sun } from './planets';
+import { moonMaps, earthMaps, cached, planetSize, bakeSun, type Sun } from './planets';
 
 /** Load a real picture from public/textures if it exists. Gives null if there is none. */
 function useRealTexture(file: string, srgb = true) {
@@ -163,13 +163,25 @@ export function Earth({ radius, position }: { radius: number; position: [number,
 
 // ---------------------------------------------------------------- planets seen through the ship windows
 // The window scene has no real sun light, so the sun light is painted into the picture. The planets do not turn.
+/** Paint sunlight (and crater shadows from the height picture) into a real NASA Moon map from public/textures. */
+function bakeReal(img: any, bumpImg: any | null, sun: Sun) {
+  const W = 2048, H = 1024;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  c.getContext('2d')!.drawImage(img, 0, 0, W, H);
+  let relief: HTMLCanvasElement | undefined;
+  if (bumpImg) { relief = document.createElement('canvas'); relief.width = W; relief.height = H; relief.getContext('2d')!.drawImage(bumpImg, 0, 0, W, H); }
+  bakeSun(c, sun, 0.03, relief);
+  return canvasTex(c);
+}
 export function WindowMoon({ radius, position, sun }: { radius: number; position: [number, number, number]; sun: Sun }) {
   const quality = useSettings((s) => s.quality);
   const size = Math.min(1024, planetSize(quality));
   const maps = useLater(() => cached('moon' + size + sunKey(sun), () => moonMaps(size, sun)), [size, sunKey(sun)]);
   const map = useMemo(() => (maps ? canvasTex(maps.color) : null), [maps]);
   const real = useRealTexture('moon.jpg');
-  const tex = real ?? map;
+  const realBump = useRealTexture('moon_bump.jpg', false);
+  const baked = useLater(() => (real && real.image ? bakeReal(real.image, realBump && realBump.image ? realBump.image : null, sun) : null), [real, realBump, sunKey(sun)]);
+  const tex = baked ?? map;
   return (
     <mesh position={position} rotation={[0, sun.rotY, 0]}>
       <sphereGeometry args={[radius, 96, 72]} />

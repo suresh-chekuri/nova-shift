@@ -35,6 +35,7 @@ export function SettingsScreen() {
             ))}
           </div></div>
         <div className="tiny">Moon: {moon === 'model' ? 'your 3D model is loaded. Moon (blend) by ThePangel, CC BY 4.0.' : moon === 'fallback' ? 'built-in Moon (no working file at public/models/moon.glb).' : 'loading...'}</div>
+        <div className="tiny">Space facts and alerts use NASA Open APIs data (solar flares, asteroids, Astronomy Picture of the Day). Moon maps, if added: NASA/Goddard/Scientific Visualization Studio, LRO.</div>
         <div className="tiny">If the game feels slow on your Mac, set Model detail to LOW, then turn off Shadows, then Glow.</div>
         <button className="btn huge" onClick={() => setScreen('menu')}>BACK</button>
       </div>

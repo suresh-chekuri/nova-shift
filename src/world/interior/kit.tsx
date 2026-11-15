@@ -303,10 +303,10 @@ export function TaskLight({ p, s, warm = false }: { p: V3; s: V3; warm?: boolean
 
 // ------------------------------------------------------------------ live screens (canvas redrawn a few times a second)
 export type Draw = (c: CanvasRenderingContext2D, W: number, H: number, g: GameState, t: number) => void;
-export function LiveScreen({ p, rotY = 0, w, h, draw, fps = 5 }: { p: V3; rotY?: number; w: number; h: number; draw: Draw; fps?: number }) {
+export function LiveScreen({ p, rotY = 0, w, h, draw, fps = 5, minH = 64 }: { p: V3; rotY?: number; w: number; h: number; draw: Draw; fps?: number; minH?: number }) {
   const { canvas, tex } = useMemo(() => {
     const c = document.createElement('canvas');
-    c.width = 512; c.height = Math.max(64, Math.round((512 * h) / w));
+    c.width = 512; c.height = Math.max(minH, Math.round((512 * h) / w));
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
     return { canvas: c, tex: t };

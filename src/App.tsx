@@ -16,6 +16,8 @@ import { SettingsScreen } from './ui/Settings';
 import { ShipyardUI } from './ui/Shipyard';
 import { TutorialCard } from './ui/TutorialCard';
 import { Toast } from './ui/Toast';
+import { NasaNotes } from './ui/NasaNotes';
+import { loadNasa } from './nasa';
 import { useGame, useUI, useSettings, setScreen, showToast } from './store';
 import { syncSim, onLog, setScreenAudio, startAmbientSafe } from './audio';
 import { loadAssetManifest } from './world/parts';
@@ -78,6 +80,7 @@ export default function App() {
   }, []);
   useEffect(() => { setScreenAudio(screen); }, [screen]);
   useEffect(() => { loadAssetManifest(); }, []);
+  useEffect(() => { loadNasa(); }, []);
 
   useEffect(() => {
     return useGame.subscribe((s, prev) => {
@@ -124,6 +127,7 @@ export default function App() {
       <BriefingScreen />
       <DebriefScreen />
       <Toast />
+      <NasaNotes />
     </div>
   );
 }
