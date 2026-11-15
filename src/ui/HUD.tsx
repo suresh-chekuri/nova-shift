@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Zap, Battery, Database, Radio, Clock, ShieldCheck, CheckCircle2, Circle, AlertTriangle } from 'lucide-react';
 import { useGame, useUI } from '../store';
+import { isTouch } from '../device';
 import { INTERACTABLES } from '../world/layout';
 import { objectiveTexts, nextGoal, isEmergency, sumData, DATA_GOAL } from '../sim';
 import { lockPointer, pose } from '../controls';
@@ -99,12 +100,12 @@ export function HUD() {
 
       <div className="hud-bottom-left">
         <div className="room">{ui.room}</div>
-        {g.elapsed < 25 && <div className="hint">W A S D move · Mouse look · Shift sprint · E interact · Esc close panel</div>}
+        {g.elapsed < 25 && <div className="hint">{isTouch ? 'Left thumb: move (push all the way to sprint) · Drag right side: look · USE: interact' : 'W A S D move · Mouse look · Shift sprint · E interact · Esc close panel'}</div>}
       </div>
 
       <div className="crosshair" />
       <Waypoint targetId={ui.panel ? null : targetId} />
-      {ui.nearby && !ui.panel && <div className="prompt">PRESS <b>E</b> TO {ui.nearby.label}</div>}
+      {ui.nearby && !ui.panel && <div className="prompt">{isTouch ? <>TAP <b>USE</b> TO {ui.nearby.label}</> : <>PRESS <b>E</b> TO {ui.nearby.label}</>}</div>}
 
       {paused && (
         <div className="pause" onClick={lockPointer}>

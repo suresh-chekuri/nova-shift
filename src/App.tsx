@@ -19,6 +19,8 @@ import { Toast } from './ui/Toast';
 import { useGame, useUI, useSettings, setScreen, showToast } from './store';
 import { syncSim, onLog, setScreenAudio, startAmbientSafe } from './audio';
 import { loadAssetManifest } from './world/parts';
+import { TouchControls } from './ui/TouchControls';
+import { isTouch } from './device';
 
 function Panels() {
   const panel = useUI((s) => s.panel);
@@ -69,9 +71,10 @@ export default function App() {
   // the browser only allows sound after a click or key press: start the audio then
   useEffect(() => {
     const go = () => { startAmbientSafe(); setScreenAudio(useUI.getState().screen); };
-    window.addEventListener('pointerdown', go, { once: true });
-    window.addEventListener('keydown', go, { once: true });
-    return () => { window.removeEventListener('pointerdown', go); window.removeEventListener('keydown', go); };
+    // iPhones only allow sound after touchend or click
+    const events = ['pointerdown', 'touchend', 'click', 'keydown'];
+    events.forEach((n) => window.addEventListener(n, go, { once: true }));
+    return () => events.forEach((n) => window.removeEventListener(n, go));
   }, []);
   useEffect(() => { setScreenAudio(screen); }, [screen]);
   useEffect(() => { loadAssetManifest(); }, []);
@@ -101,7 +104,7 @@ export default function App() {
       <Canvas
         key={st.shadows ? 'sh' : 'nosh'}
         shadows={st.shadows}
-        dpr={[1, 1.5]}
+        dpr={isTouch ? [1, 1.25] : [1, 1.5]}
         camera={{ fov: screen === 'game' ? 72 : 50, near: 0.05, far: 900, position: [0, 1.65, -2] }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         onCreated={({ gl }) => {
@@ -112,6 +115,7 @@ export default function App() {
         <World />
       </Canvas>
       {screen === 'game' && <HUD />}
+      <TouchControls />
       <Panels />
       <GameTutorial />
       <MainMenu />

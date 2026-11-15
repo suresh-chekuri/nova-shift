@@ -1,3 +1,4 @@
+import { isTouch } from './device';
 import { create } from 'zustand';
 import * as sim from './sim';
 import { useUI, useDesign, mutate, launch, resetToMenu, markTutorialDone, type Screen } from './store';
@@ -37,16 +38,16 @@ export interface TutStep {
 export const STEPS: TutStep[] = [
   {
     title: 'MOVEMENT',
-    goal: 'Walk to the glowing console and press E.',
-    text: 'Move with W A S D. Look with the mouse. Hold Shift to sprint. When you are close to a console, press E to use it. Follow the blue marker.',
+    goal: isTouch ? 'Walk to the glowing console and tap USE.' : 'Walk to the glowing console and press E.',
+    text: isTouch ? 'Move with your left thumb. Drag the right side of the screen to look. Push the stick all the way to sprint. When you are close to a console, tap USE. Follow the blue marker.' : 'Move with W A S D. Look with the mouse. Hold Shift to sprint. When you are close to a console, press E to use it. Follow the blue marker.',
     target: 'command',
     done: (g, ui) => ui.panel === 'command' && useTut.getState().used.move && useTut.getState().used.look && useTut.getState().used.sprint,
     checks: () => {
       const u = useTut.getState().used;
       return [
-        { label: 'Walk (W A S D)', ok: u.move },
-        { label: 'Look around (mouse)', ok: u.look },
-        { label: 'Sprint (hold Shift while walking)', ok: u.sprint },
+        { label: isTouch ? 'Walk (left thumb)' : 'Walk (W A S D)', ok: u.move },
+        { label: isTouch ? 'Look around (drag right side)' : 'Look around (mouse)', ok: u.look },
+        { label: isTouch ? 'Sprint (push the stick all the way)' : 'Sprint (hold Shift while walking)', ok: u.sprint },
       ];
     },
   },

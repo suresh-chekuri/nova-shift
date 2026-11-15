@@ -1,77 +1,213 @@
-// Moon, Earth and sun used by the main menu and the shipyard windows.
-import { useMemo, useRef } from 'react';
+// Moon, Earth and their glow. Used by the main menu, the shipyard windows and the ship windows.
+//
+// The pictures are drawn by code (planets.ts), so no files are needed.
+// Want real NASA photos? Put these files in public/textures/ (see the README there). Missing files are ignored:
+//   moon.jpg, moon_bump.jpg, earth.jpg, earth_clouds.jpg
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { useSettings } from '../store';
+import { moonMaps, earthMaps, cached, planetSize, type Sun } from './planets';
 
-function moonCanvases() {
-  const W = 1024, Hh = 512;
-  const color = document.createElement('canvas'); color.width = W; color.height = Hh;
-  const bump = document.createElement('canvas'); bump.width = W; bump.height = Hh;
-  const c = color.getContext('2d')!, b = bump.getContext('2d')!;
-  c.fillStyle = '#a8a69f'; c.fillRect(0, 0, W, Hh);
-  b.fillStyle = '#808080'; b.fillRect(0, 0, W, Hh);
-  // dark seas
-  for (let i = 0; i < 9; i++) {
-    const x = Math.random() * W, y = 60 + Math.random() * 380, rx = 40 + Math.random() * 110, ry = 30 + Math.random() * 70;
-    const g = c.createRadialGradient(x, y, 0, x, y, rx);
-    g.addColorStop(0, 'rgba(60,62,70,0.55)'); g.addColorStop(1, 'rgba(60,62,70,0)');
-    c.fillStyle = g; c.beginPath(); c.ellipse(x, y, rx, ry, Math.random(), 0, 7); c.fill();
-  }
-  // craters
-  for (let i = 0; i < 900; i++) {
-    const x = Math.random() * W, y = Math.random() * Hh, r = 2 + Math.pow(Math.random(), 3) * 38;
-    const g = c.createRadialGradient(x, y, r * 0.2, x, y, r);
-    g.addColorStop(0, 'rgba(50,50,55,0.35)'); g.addColorStop(0.8, 'rgba(50,50,55,0.1)'); g.addColorStop(1, 'rgba(235,235,230,0.3)');
-    c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
-    const gb = b.createRadialGradient(x, y, 0, x, y, r);
-    gb.addColorStop(0, 'rgba(20,20,20,0.9)'); gb.addColorStop(0.7, 'rgba(70,70,70,0.6)'); gb.addColorStop(0.9, 'rgba(230,230,230,0.9)'); gb.addColorStop(1, 'rgba(128,128,128,0)');
-    b.fillStyle = gb; b.beginPath(); b.arc(x, y, r, 0, 7); b.fill();
-  }
-  for (let i = 0; i < 6000; i++) {
-    c.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '0,0,0'},${Math.random() * 0.05})`;
-    c.fillRect(Math.random() * W, Math.random() * Hh, 2, 2);
-    b.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '0,0,0'},${Math.random() * 0.08})`;
-    b.fillRect(Math.random() * W, Math.random() * Hh, 2, 2);
-  }
-  return { color, bump };
+/** Load a real picture from public/textures if it exists. Gives null if there is none. */
+function useRealTexture(file: string, srgb = true) {
+  const [tex, setTex] = useState<THREE.Texture | null>(null);
+  useEffect(() => {
+    let dead = false;
+    new THREE.TextureLoader().load(
+      import.meta.env.BASE_URL + 'textures/' + file,
+      (t) => {
+        if (dead) return;
+        if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+        t.anisotropy = 8;
+        setTex(t);
+      },
+      undefined,
+      () => { /* no such file: use the drawn planet */ },
+    );
+    return () => { dead = true; };
+  }, [file, srgb]);
+  return tex;
 }
 
+/** Draw the pictures a moment after the first frame, so the screen never freezes while they are made. */
+function useLater<T>(make: () => T, deps: unknown[]): T | null {
+  const [v, setV] = useState<T | null>(null);
+  useEffect(() => {
+    let dead = false;
+    const id = window.setTimeout(() => {
+      try { const r = make(); if (!dead) setV(r); } catch (e) { console.error('[NOVA SHIFT] planet picture failed', e); }
+    }, 30);
+    return () => { dead = true; window.clearTimeout(id); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+  return v;
+}
+
+const sunKey = (s?: Sun) => (s ? s.dir.join(',') + '@' + s.rotY : 'raw');
+
+function canvasTex(c: HTMLCanvasElement, srgb = true) {
+  const t = new THREE.CanvasTexture(c);
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+// A soft blue glow around a planet: bright at the planet's edge, fading to nothing.
+export function Atmosphere({ radius, color = '#5aa8ff', strength = 1 }: { radius: number; color?: string; strength?: number }) {
+  const mat = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        uniforms: { uColor: { value: new THREE.Color(color) }, uStrength: { value: strength } },
+        vertexShader: `
+          varying vec3 vN; varying vec3 vV;
+          void main() {
+            vN = normalize(normalMatrix * normal);
+            vec4 mv = modelViewMatrix * vec4(position, 1.0);
+            vV = normalize(-mv.xyz);
+            gl_Position = projectionMatrix * mv;
+          }`,
+        fragmentShader: `
+          uniform vec3 uColor; uniform float uStrength;
+          varying vec3 vN; varying vec3 vV;
+          void main() {
+            float d = abs(dot(normalize(vN), normalize(vV)));
+            float i = pow(clamp(d / 0.36, 0.0, 1.0), 2.0) * uStrength;
+            gl_FragColor = vec4(uColor, i);
+          }`,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.BackSide,
+      }),
+    [color, strength],
+  );
+  return (
+    <mesh>
+      <sphereGeometry args={[radius * 1.07, 64, 48]} />
+      <primitive object={mat} attach="material" />
+    </mesh>
+  );
+}
+
+// ---------------------------------------------------------------- lit Moon and Earth (menu, shipyard)
 export function Moon({ radius, position }: { radius: number; position: [number, number, number] }) {
-  const { map, bump } = useMemo(() => {
-    const { color, bump } = moonCanvases();
-    const m = new THREE.CanvasTexture(color); m.colorSpace = THREE.SRGBColorSpace;
-    return { map: m, bump: new THREE.CanvasTexture(bump) };
-  }, []);
+  const quality = useSettings((s) => s.quality);
+  const size = planetSize(quality);
+  const maps = useLater(() => cached('moon' + size, () => moonMaps(size)), [size]);
+  const drawn = useMemo(() => (maps ? { map: canvasTex(maps.color), bump: canvasTex(maps.bump, false) } : null), [maps]);
+  const realMap = useRealTexture('moon.jpg');
+  const realBump = useRealTexture('moon_bump.jpg', false);
+  const map = realMap ?? drawn?.map ?? null;
+  const bump = realBump ?? (realMap ? null : drawn?.bump ?? null);
   return (
     <mesh position={position}>
-      <sphereGeometry args={[radius, 96, 64]} />
-      <meshStandardMaterial map={map} bumpMap={bump} bumpScale={radius * 0.05} roughness={1} metalness={0} />
+      <sphereGeometry args={[radius, 128, 96]} />
+      <meshStandardMaterial
+        key={(map ? 1 : 0) + (bump ? 2 : 0)}
+        color={map ? '#ffffff' : '#9a9892'}
+        map={map}
+        bumpMap={bump}
+        bumpScale={radius * 0.05}
+        roughness={1}
+        metalness={0}
+      />
     </mesh>
   );
 }
 
 export function Earth({ radius, position }: { radius: number; position: [number, number, number] }) {
-  const ref = useRef<THREE.Mesh>(null!);
-  const tex = useMemo(() => {
-    const c = document.createElement('canvas'); c.width = 1024; c.height = 512;
-    const g = c.getContext('2d')!;
-    g.fillStyle = '#1d4ed8'; g.fillRect(0, 0, 1024, 512);
-    for (let i = 0; i < 22; i++) {
-      g.fillStyle = `rgba(${30 + Math.random() * 30},${110 + Math.random() * 50},${50 + Math.random() * 30},0.95)`;
-      g.beginPath(); g.ellipse(Math.random() * 1024, 80 + Math.random() * 350, 30 + Math.random() * 90, 18 + Math.random() * 50, Math.random() * 3, 0, 7); g.fill();
-    }
-    for (let i = 0; i < 90; i++) {
-      g.fillStyle = 'rgba(255,255,255,0.4)';
-      g.beginPath(); g.ellipse(Math.random() * 1024, Math.random() * 512, 25 + Math.random() * 70, 4 + Math.random() * 12, Math.random() * 0.6, 0, 7); g.fill();
-    }
-    g.fillStyle = 'rgba(255,255,255,0.8)'; g.fillRect(0, 0, 1024, 22); g.fillRect(0, 490, 1024, 22);
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
-  }, []);
-  useFrame((_, dt) => { if (ref.current) ref.current.rotation.y += dt * 0.02; });
+  const quality = useSettings((s) => s.quality);
+  const size = Math.min(1024, planetSize(quality));
+  const maps = useLater(() => cached('earth' + size, () => earthMaps(size)), [size]);
+  const drawn = useMemo(
+    () => (maps ? { map: canvasTex(maps.color), rough: canvasTex(maps.rough, false), clouds: canvasTex(maps.clouds) } : null),
+    [maps],
+  );
+  const realMap = useRealTexture('earth.jpg');
+  const realClouds = useRealTexture('earth_clouds.jpg', false);
+  const map = realMap ?? drawn?.map ?? null;
+  const surface = useRef<THREE.Mesh>(null!);
+  const clouds = useRef<THREE.Mesh>(null!);
+  useFrame((_, dt) => {
+    if (surface.current) surface.current.rotation.y += dt * 0.02;
+    if (clouds.current) clouds.current.rotation.y += dt * 0.026;
+  });
   return (
     <group position={position}>
-      <mesh ref={ref}><sphereGeometry args={[radius, 64, 48]} /><meshStandardMaterial map={tex} roughness={0.8} /></mesh>
-      <mesh><sphereGeometry args={[radius * 1.05, 48, 32]} /><meshBasicMaterial color="#60a5fa" transparent opacity={0.16} side={THREE.BackSide} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh>
+      <mesh ref={surface}>
+        <sphereGeometry args={[radius, 96, 72]} />
+        <meshStandardMaterial
+          key={map ? 1 : 0}
+          color={map ? '#ffffff' : '#1d4ed8'}
+          map={map}
+          roughnessMap={realMap ? null : drawn?.rough ?? null}
+          roughness={realMap ? 0.7 : 1}
+          metalness={0}
+        />
+      </mesh>
+      {(realClouds || drawn) && (
+        <mesh ref={clouds}>
+          <sphereGeometry args={[radius * 1.012, 96, 72]} />
+          {realClouds ? (
+            <meshStandardMaterial key="rc" color="#ffffff" alphaMap={realClouds} transparent depthWrite={false} roughness={1} />
+          ) : (
+            <meshStandardMaterial key="dc" map={drawn!.clouds} transparent depthWrite={false} roughness={1} />
+          )}
+        </mesh>
+      )}
+      <Atmosphere radius={radius} />
     </group>
+  );
+}
+
+// ---------------------------------------------------------------- planets seen through the ship windows
+// The window scene has no real sun light, so the sun light is painted into the picture. The planets do not turn.
+export function WindowMoon({ radius, position, sun }: { radius: number; position: [number, number, number]; sun: Sun }) {
+  const quality = useSettings((s) => s.quality);
+  const size = Math.min(1024, planetSize(quality));
+  const maps = useLater(() => cached('moon' + size + sunKey(sun), () => moonMaps(size, sun)), [size, sunKey(sun)]);
+  const map = useMemo(() => (maps ? canvasTex(maps.color) : null), [maps]);
+  const real = useRealTexture('moon.jpg');
+  const tex = real ?? map;
+  return (
+    <mesh position={position} rotation={[0, sun.rotY, 0]}>
+      <sphereGeometry args={[radius, 96, 72]} />
+      <meshBasicMaterial key={tex ? 1 : 0} map={tex} color={tex ? '#ffffff' : '#555555'} />
+    </mesh>
+  );
+}
+
+export function WindowEarth({ radius, position, sun }: { radius: number; position: [number, number, number]; sun: Sun }) {
+  const quality = useSettings((s) => s.quality);
+  const size = Math.min(1024, planetSize(quality));
+  const maps = useLater(() => cached('earthw' + size + sunKey(sun), () => earthMaps(size, sun, true)), [size, sunKey(sun)]);
+  const map = useMemo(() => (maps ? canvasTex(maps.color) : null), [maps]);
+  const real = useRealTexture('earth.jpg');
+  const tex = real ?? map;
+  return (
+    <group position={position}>
+      <mesh rotation={[0, sun.rotY, 0]}>
+        <sphereGeometry args={[radius, 96, 72]} />
+        <meshBasicMaterial key={tex ? 1 : 0} map={tex} color={tex ? '#ffffff' : '#1d4ed8'} />
+      </mesh>
+      <Atmosphere radius={radius} strength={0.9} />
+    </group>
+  );
+}
+
+// the close lunar ground below the Command Deck window (no sun painted in)
+export function WindowHorizon({ radius, position }: { radius: number; position: [number, number, number] }) {
+  const quality = useSettings((s) => s.quality);
+  const size = planetSize(quality);
+  const maps = useLater(() => cached('moon' + size, () => moonMaps(size)), [size]);
+  const map = useMemo(() => (maps ? canvasTex(maps.color) : null), [maps]);
+  const real = useRealTexture('moon.jpg');
+  const tex = real ?? map;
+  return (
+    <mesh position={position}>
+      <sphereGeometry args={[radius, 64, 32]} />
+      <meshBasicMaterial key={tex ? 1 : 0} map={tex} color={tex ? '#8a8a86' : '#444444'} />
+    </mesh>
   );
 }

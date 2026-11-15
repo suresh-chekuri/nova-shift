@@ -20,7 +20,7 @@ export function SettingsScreen() {
           <input type="range" min={0} max={1} step={0.05} value={st.sfxVol} onChange={(e) => { updateSettings({ sfxVol: +e.target.value }); sfx.click(); }} /></div>
         <div className="set-row"><label>Music volume <b>{Math.round(st.musicVol * 100)}%</b></label>
           <input type="range" min={0} max={1} step={0.05} value={st.musicVol} onChange={(e) => { updateSettings({ musicVol: +e.target.value });  }} /></div>
-        <div className="set-row"><label>Mouse sensitivity <b>{st.sensitivity.toFixed(1)}x</b></label>
+        <div className="set-row"><label>Look sensitivity (mouse or touch) <b>{st.sensitivity.toFixed(1)}x</b></label>
           <input type="range" min={0.3} max={2.5} step={0.1} value={st.sensitivity} onChange={(e) => updateSettings({ sensitivity: +e.target.value })} /></div>
         <div className="set-row"><label>Glow effect (bloom) <b>{st.bloom ? 'ON' : 'OFF'}</b></label>
           <button className={'btn ' + (st.bloom ? 'primary' : '')} onClick={() => updateSettings({ bloom: !st.bloom })}>{st.bloom ? 'ON' : 'OFF'}</button></div>

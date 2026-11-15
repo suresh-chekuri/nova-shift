@@ -1,3 +1,4 @@
+import { isTouch } from './device';
 import { create } from 'zustand';
 import * as sim from './sim';
 import { sfx } from './sfx';
@@ -43,7 +44,7 @@ export type Quality = 'low' | 'medium' | 'high';
 // `volume` is the MASTER volume (kept under the old name so old saves still work)
 interface Settings { perf: number; volume: number; ambientVol: number; sfxVol: number; musicVol: number; muted: boolean; sensitivity: number; bloom: boolean; shadows: boolean; quality: Quality }
 function loadSettings(): Settings {
-  const d: Settings = { perf: 31, volume: 0.7, ambientVol: 0.7, sfxVol: 0.8, musicVol: 0.5, muted: false, sensitivity: 1, bloom: false, shadows: false, quality: 'medium' };
+  const d: Settings = { perf: 31, volume: 0.7, ambientVol: 0.7, sfxVol: 0.8, musicVol: 0.5, muted: false, sensitivity: 1, bloom: false, shadows: false, quality: isTouch ? 'low' : 'medium' };
   try {
     const saved = JSON.parse(localStorage.getItem('nova-settings') || '{}');
     // V3.1 speed-up: shadows and glow start OFF once (they cost the most). You can turn them on again in Settings.

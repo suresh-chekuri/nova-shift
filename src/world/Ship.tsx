@@ -6,6 +6,7 @@ import { useGame, useSettings, useUI } from '../store';
 import { isEmergency, nextGoal, type GameState, type InstrId } from '../sim';
 import { Instrument } from './ShipModel';
 import { InteriorExtras, ConsoleDetail } from './interior/Rooms';
+import { WindowMoon, WindowEarth, WindowHorizon } from './space';
 import { LAMP_SPOTS, DOOR_LIST, spansAround } from './interior/spots';
 import { H, WALL_SEGS, FLOOR_RECTS, INTERACTABLES, type Seg } from './layout';
 
@@ -56,39 +57,6 @@ function useTiled(kind: 'wall' | 'floor' | 'ceil', rx: number, ry: number) {
     t.repeat.set(Math.max(1, rx), Math.max(1, ry));
     return t;
   }, [kind, rx, ry]);
-}
-
-function planetTexture(kind: 'moon' | 'earth') {
-  const c = document.createElement('canvas');
-  c.width = 512; c.height = 256;
-  const g = c.getContext('2d')!;
-  if (kind === 'moon') {
-    g.fillStyle = '#b9b7b0'; g.fillRect(0, 0, 512, 256);
-    for (let i = 0; i < 260; i++) {
-      const x = Math.random() * 512, y = Math.random() * 256, r = 3 + Math.random() * 18;
-      g.fillStyle = `rgba(70,70,75,${0.12 + Math.random() * 0.25})`;
-      g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
-      g.fillStyle = 'rgba(235,235,230,0.25)';
-      g.beginPath(); g.arc(x - r * 0.15, y - r * 0.15, r * 0.7, 0, 7); g.fill();
-    }
-    for (let i = 0; i < 6; i++) {
-      g.fillStyle = 'rgba(60,62,70,0.35)';
-      g.beginPath(); g.ellipse(Math.random() * 512, Math.random() * 256, 30 + Math.random() * 40, 20 + Math.random() * 25, 0, 0, 7); g.fill();
-    }
-  } else {
-    g.fillStyle = '#1d4ed8'; g.fillRect(0, 0, 512, 256);
-    for (let i = 0; i < 14; i++) {
-      g.fillStyle = `rgba(34,139,60,${0.7 + Math.random() * 0.3})`;
-      g.beginPath(); g.ellipse(Math.random() * 512, 40 + Math.random() * 180, 25 + Math.random() * 50, 12 + Math.random() * 25, Math.random() * 3, 0, 7); g.fill();
-    }
-    for (let i = 0; i < 40; i++) {
-      g.fillStyle = 'rgba(255,255,255,0.35)';
-      g.beginPath(); g.ellipse(Math.random() * 512, Math.random() * 256, 20 + Math.random() * 40, 4 + Math.random() * 8, 0, 0, 7); g.fill();
-    }
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
 }
 
 // One shared material for ceiling lamps. The lights controller changes its color.
@@ -843,33 +811,19 @@ function Lights() {
 
 // ---------- Outside ----------
 function Outside() {
-  const moonTex = useMemo(() => planetTexture('moon'), []);
-  const earthTex = useMemo(() => planetTexture('earth'), []);
-  const moon = useRef<THREE.Mesh>(null!);
-  useFrame((_, dt) => { if (moon.current) moon.current.rotation.y += dt * 0.01; });
+  // sun is low in the east. These are the directions from each planet to the sun (used to paint the light on them).
+  const moonSun = useMemo(() => ({ dir: [270, 14, -75] as [number, number, number], rotY: Math.PI }), []);
+  const earthSun = useMemo(() => ({ dir: [270, 8, 140] as [number, number, number], rotY: 0 }), []);
   return (
     <>
       <Stars radius={260} depth={80} count={5000} factor={6} saturation={0} fade speed={0.4} />
-      <mesh ref={moon} position={[0, 8, 95]} rotation={[0, Math.PI, 0]}>
-        <sphereGeometry args={[30, 64, 48]} />
-        <meshBasicMaterial map={moonTex} />
-      </mesh>
+      <WindowMoon radius={30} position={[0, 8, 95]} sun={moonSun} />
       {/* a nearby piece of lunar horizon below the Command Deck window */}
-      <mesh position={[0, -150, 60]}>
-        <sphereGeometry args={[160, 64, 32]} />
-        <meshBasicMaterial map={moonTex} color="#8a8a86" />
-      </mesh>
+      <WindowHorizon radius={160} position={[0, -150, 60]} />
       {/* the Sun: low in the east, seen through the Science Lab window. Hard white, no atmosphere. */}
       <mesh position={[270, 22, 20]}><sphereGeometry args={[9, 24, 16]} /><meshBasicMaterial color="#fffaf0" /></mesh>
       <mesh position={[270, 22, 20]}><sphereGeometry args={[16, 24, 16]} /><meshBasicMaterial color="#ffe9b8" transparent opacity={0.16} depthWrite={false} /></mesh>
-      <mesh position={[0, 14, -120]}>
-        <sphereGeometry args={[14, 40, 28]} />
-        <meshBasicMaterial map={earthTex} />
-      </mesh>
-      <mesh position={[0, 14, -120]}>
-        <sphereGeometry args={[14.6, 32, 24]} />
-        <meshBasicMaterial color="#60a5fa" transparent opacity={0.18} />
-      </mesh>
+      <WindowEarth radius={14} position={[0, 14, -120]} sun={earthSun} />
     </>
   );
 }

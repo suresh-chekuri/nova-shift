@@ -1,4 +1,5 @@
 import { Rocket, RotateCcw } from 'lucide-react';
+import { isTouch } from '../device';
 import { useGame, useUI, useDesign, launch, resetToMenu, setScreen } from '../store';
 import { lockPointer } from '../controls';
 import { objectiveTexts } from '../sim';
@@ -27,15 +28,26 @@ export function BriefingScreen() {
           </div>
           <div>
             <h3>CONTROLS</h3>
-            <table className="keys">
-              <tbody>
-                <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td>Move</td></tr>
-                <tr><td><kbd>Mouse</kbd></td><td>Look around</td></tr>
-                <tr><td><kbd>Shift</kbd></td><td>Sprint</td></tr>
-                <tr><td><kbd>E</kbd></td><td>Interact with a console</td></tr>
-                <tr><td><kbd>Esc</kbd></td><td>Close a panel / free the mouse</td></tr>
-              </tbody>
-            </table>
+            {isTouch ? (
+              <table className="keys">
+                <tbody>
+                  <tr><td><kbd>Left thumb</kbd></td><td>Move (push all the way to sprint)</td></tr>
+                  <tr><td><kbd>Right thumb</kbd></td><td>Drag to look around</td></tr>
+                  <tr><td><kbd>USE</kbd></td><td>Interact with a console</td></tr>
+                  <tr><td><kbd>CLOSE</kbd></td><td>Close a panel</td></tr>
+                </tbody>
+              </table>
+            ) : (
+              <table className="keys">
+                <tbody>
+                  <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td>Move</td></tr>
+                  <tr><td><kbd>Mouse</kbd></td><td>Look around</td></tr>
+                  <tr><td><kbd>Shift</kbd></td><td>Sprint</td></tr>
+                  <tr><td><kbd>E</kbd></td><td>Interact with a console</td></tr>
+                  <tr><td><kbd>Esc</kbd></td><td>Close a panel / free the mouse</td></tr>
+                </tbody>
+              </table>
+            )}
             <h3>YOUR SPACECRAFT</h3>
             <p>The ship you built in the Shipyard is the ship you fly. Its power, battery, antenna and instruments set the rules.</p>
           </div>

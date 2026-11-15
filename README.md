@@ -63,3 +63,19 @@ W A S D move, mouse look, Shift sprint, E interact, Esc close a panel / free the
 - `npm run test:layout` — every room and console can be reached
 - audio test: `npx tsx scripts/audio-test.ts` (uses a fake sound card; no speakers needed)
 
+
+## Play on a phone or tablet (Android and iOS)
+
+The game runs in the phone browser. No app store is needed.
+
+- Open the game link in Chrome (Android) or Safari (iPhone/iPad). Use landscape.
+- Left thumb: move. Push the stick all the way to sprint.
+- Drag on the right side: look around.
+- USE button: same as pressing E. It lights up near a console.
+- Install: Android Chrome menu > "Add to Home screen". iOS Safari Share > "Add to Home Screen". It then opens full screen.
+- Phones start with "low" graphics. Change it in Settings if the phone is fast.
+
+## Moon and Earth
+
+Both planets are drawn by code (craters, continents, clouds, atmosphere glow).
+To use real NASA pictures, see `public/textures/README.md`.

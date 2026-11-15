@@ -35,7 +35,7 @@ export function MainMenu() {
           <MenuButton icon={<Rocket size={20} />} label="NEW MISSION" sub={done ? 'Design your ship and launch' : 'Locked until training is complete'} locked={!done} onClick={newMission} />
           <MenuButton icon={<Wrench size={20} />} label="DESIGN SPACECRAFT" sub="Open the Shipyard" onClick={() => useUI.setState({ shipyardFor: 'menu', screen: 'shipyard' })} />
           <MenuButton icon={<GraduationCap size={20} />} label="TUTORIAL" sub={done ? 'Replay the training' : 'Recommended first'} onClick={startTutorial} />
-          <MenuButton icon={<Cog size={20} />} label="SETTINGS" sub="Sound, mouse, graphics" onClick={() => setScreen('settings')} />
+          <MenuButton icon={<Cog size={20} />} label="SETTINGS" sub="Sound, look speed, graphics" onClick={() => setScreen('settings')} />
         </div>
       </div>
       <div className="menu-foot">v2.0 · Press a button to begin</div>

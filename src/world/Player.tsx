@@ -6,6 +6,8 @@ import { useTut } from '../tutorial';
 import { updateListener } from '../audio';
 import { COLLIDERS, INTERACTABLES, roomAt } from './layout';
 import { lockPointer, pose } from '../controls';
+import { isTouch } from '../device';
+import { touch } from '../touch';
 
 const RADIUS = 0.38;
 const EYE = 1.65;
@@ -25,6 +27,11 @@ export function Player() {
   const { camera } = useThree();
   const st = useRef({ x: START.x, z: START.z, yaw: START.yaw, pitch: 0, vx: 0, vz: 0, bob: 0, started: false, posT: 0 });
   const keys = useRef<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (isTouch) useUI.setState({ locked: true });
+    return () => { if (isTouch) useUI.setState({ locked: false }); };
+  }, []);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -85,11 +92,15 @@ export function Player() {
 
     if (active) {
       const k = keys.current;
-      let f = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0);
-      let r = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0);
-      const len = Math.hypot(f, r) || 1;
-      f /= len; r /= len;
-      const sprint = !!(k.ShiftLeft || k.ShiftRight);
+      // keyboard (digital) + touch stick (analog)
+      let f = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) + touch.moveY;
+      let r = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + touch.moveX;
+      const raw = Math.hypot(f, r);
+      const len = raw || 1;
+      const power = Math.min(1, raw);       // a small stick push = a slow walk
+      f = (f / len) * power; r = (r / len) * power;
+      const stickFull = Math.hypot(touch.moveX, touch.moveY) > 0.92; // push the stick all the way to sprint
+      const sprint = !!(k.ShiftLeft || k.ShiftRight) || stickFull;
       const speed = sprint ? 5.4 : 3.2;
       const tx = (-sinY * f + cosY * r) * speed;
       const tz = (-cosY * f - sinY * r) * speed;
@@ -101,6 +112,13 @@ export function Player() {
       const nz = s.z + s.vz * dt;
       if (!blocked(s.x, nz)) s.z = nz; else s.vz = 0;
       s.bob += dt * Math.hypot(s.vx, s.vz) * 2.4;
+      if (touch.lookX || touch.lookY) {
+        const kt = 0.005 * useSettings.getState().sensitivity;
+        s.yaw -= touch.lookX * kt;
+        s.pitch = Math.max(-1.3, Math.min(1.3, s.pitch - touch.lookY * kt));
+        touch.lookX = 0; touch.lookY = 0;
+        useTut.getState().note('look');
+      }
       if (f !== 0 || r !== 0) {
         useTut.getState().note('move');
         if (sprint) useTut.getState().note('sprint');
@@ -123,6 +141,7 @@ export function Player() {
       if (room !== ui.room) useUI.setState({ room });
     } else {
       s.vx = 0; s.vz = 0;
+      touch.lookX = 0; touch.lookY = 0;
       if (ui.nearby) useUI.setState({ nearby: null });
     }
 
