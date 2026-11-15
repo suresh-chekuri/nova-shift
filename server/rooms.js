@@ -74,6 +74,7 @@ export class Rooms {
   start(id) {
     const room = this.roomOf(id);
     if (!room || room.hostId !== id) return { error: 'Only the host can start.' };
+    if (room.phase !== 'lobby') return { error: 'The mission has already started.' };
     if (!this.canStart(room)) return { error: 'Everyone must press READY first.' };
     room.phase = 'playing';
     return { room };

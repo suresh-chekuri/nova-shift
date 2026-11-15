@@ -35,6 +35,17 @@ const http = createServer((req, res) => {
 const io = new Server(http, { cors: { origin: '*' }, pingInterval: 10000, pingTimeout: 60000 });
 const rooms = new Rooms();
 
+// One line per important event. High-frequency messages (game:state, player:pos) are never logged.
+const log = (...args) => console.log(new Date().toISOString(), ...args);
+const who = (socket) => {
+  const room = rooms.roomOf(socket.id);
+  const p = room?.players.get(socket.id);
+  return p ? `${p.name} (${p.role ?? 'no role'}${room.hostId === socket.id ? ', host' : ''})` : socket.id;
+};
+const tag = (room) => `[room ${room.code}]`;
+// Actions players press often (slider drags) would flood the log.
+const QUIET_ACTIONS = new Set(['setAntenna']);
+
 function broadcastRoom(room) {
   io.to(room.code).emit('room:update', rooms.snapshot(room));
 }
@@ -48,36 +59,47 @@ io.on('connection', (socket) => {
     socket.on(event, (...args) => {
       try { fn(...args); } catch (e) { console.error('error in ' + event + ':', e); }
     });
+  log(`connect ${socket.id} (${io.engine.clientsCount} online)`);
   on('room:create', (name, ack) => {
     const { room } = rooms.create(socket.id, name);
     socket.join(room.code);
+    log(`${tag(room)} created by ${who(socket)} (${rooms.rooms.size} rooms open)`);
     ack?.({ ok: true, id: socket.id, room: rooms.snapshot(room) });
     broadcastRoom(room);
   });
 
   on('room:join', (msg, ack) => {
     const res = rooms.join(msg?.code, socket.id, msg?.name);
-    if (res.error) return ack?.({ ok: false, error: res.error });
+    if (res.error) {
+      log(`join failed for ${socket.id} code=${String(msg?.code ?? '').slice(0, 8)}: ${res.error}`);
+      return ack?.({ ok: false, error: res.error });
+    }
     socket.join(res.room.code);
+    log(`${tag(res.room)} ${who(socket)} joined (${res.room.players.size}/4)`);
     ack?.({ ok: true, id: socket.id, room: rooms.snapshot(res.room) });
     broadcastRoom(res.room);
   });
 
   on('player:role', (role) => {
     const room = rooms.setRole(socket.id, role);
-    if (room) broadcastRoom(room);
+    if (room) { log(`${tag(room)} ${who(socket)} took role ${role}`); broadcastRoom(room); }
   });
 
   on('player:ready', (ready) => {
     const room = rooms.setReady(socket.id, ready);
-    if (room) broadcastRoom(room);
+    if (room) { log(`${tag(room)} ${who(socket)} ${ready ? 'is READY' : 'is not ready'}`); broadcastRoom(room); }
   });
 
   // host starts: send the design so every player flies the same ship
   on('room:start', (design, ack) => {
     const res = rooms.start(socket.id);
-    if (res.error) return ack?.({ ok: false, error: res.error });
+    if (res.error) {
+      log(`start refused for ${who(socket)}: ${res.error}`);
+      return ack?.({ ok: false, error: res.error });
+    }
     ack?.({ ok: true });
+    const crew = [...res.room.players.values()].map((p) => `${p.name}=${p.role ?? '-'}`).join(', ');
+    log(`${tag(res.room)} MISSION START mission=${design?.mission ?? 'echo'} crew: ${crew}`);
     io.to(res.room.code).emit('game:start', { design, room: rooms.snapshot(res.room) });
     broadcastRoom(res.room);
   });
@@ -86,6 +108,8 @@ io.on('connection', (socket) => {
   on('game:action', (msg) => {
     const room = rooms.roomOf(socket.id);
     if (!room || socket.id === room.hostId) return;
+    const name = typeof msg?.name === 'string' ? msg.name.slice(0, 30) : '?';
+    if (!QUIET_ACTIONS.has(name)) log(`${tag(room)} action ${name} from ${who(socket)}`);
     io.to(room.hostId).emit('game:action', { ...msg, from: socket.id });
   });
   on('game:state', (state) => {
@@ -103,28 +127,29 @@ io.on('connection', (socket) => {
     });
   });
 
-  on('disconnect', () => {
+  // why: 'left' (pressed leave) or the Socket.IO disconnect reason (e.g. 'transport close', 'ping timeout')
+  function leave(why) {
+    const name = who(socket); // read before leave() removes the player
     const res = rooms.leave(socket.id);
     if (!res) return;
+    const inGame = res.room.phase === 'playing' ? ' during the mission' : ' in the lobby';
     if (res.closed) {
+      log(`${tag(res.room)} ${name} left${inGame} (${why}) -> ROOM CLOSED (${rooms.rooms.size} rooms open)`);
       io.to(res.room.code).emit('room:closed');
       io.in(res.room.code).socketsLeave(res.room.code);
     } else {
+      log(`${tag(res.room)} ${name} left${inGame} (${why}), ${res.room.players.size} still in room`);
       io.to(res.room.code).emit('player:left', socket.id);
       broadcastRoom(res.room);
     }
+  }
+  on('disconnect', (reason) => {
+    leave(reason);
+    log(`disconnect ${socket.id} (${reason})`);
   });
   on('room:leave', () => {
-    const res = rooms.leave(socket.id);
+    leave('left');
     socket.rooms.forEach((r) => r !== socket.id && socket.leave(r));
-    if (!res) return;
-    if (res.closed) {
-      io.to(res.room.code).emit('room:closed');
-      io.in(res.room.code).socketsLeave(res.room.code);
-    } else {
-      io.to(res.room.code).emit('player:left', socket.id);
-      broadcastRoom(res.room);
-    }
   });
 });
 

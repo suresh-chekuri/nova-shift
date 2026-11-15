@@ -323,7 +323,10 @@ export function applyRemoteAction(name: string, args: any[], fromId: string) {
   const net = useNet.getState();
   const players = net.room?.players ?? [];
   const from = players.find((p) => p.id === fromId);
-  if (!LOCAL[name] || !allowed(name, args, from?.role ?? null, players)) return;
+  if (!LOCAL[name] || !allowed(name, args, from?.role ?? null, players)) {
+    console.warn('[NOVA SHIFT] host rejected action', name, 'from', from?.name ?? fromId, '(role:', from?.role ?? 'none', ')');
+    return;
+  }
   mutate((g) => LOCAL[name](g, ...args));
 }
 

@@ -57,7 +57,11 @@ export function HUD() {
   const emergency = isEmergency(g);
   const recent = g.log.filter((l) => g.elapsed - l.t < 7 && l.level !== 'info').slice(-3);
   const infoRecent = g.log.filter((l) => g.elapsed - l.t < 9 && l.level === 'info').slice(-1);
-  const paused = !ui.locked && !ui.panel && net.mode === 'solo';
+  // No mouse capture = no movement or E. In solo this pauses the game; in multiplayer the mission keeps
+  // running (the host runs it), but the player still needs a click to capture the mouse — a mission
+  // started by the host's game:start message never got a click from this player.
+  const solo = net.mode === 'solo';
+  const paused = !ui.locked && !ui.panel;
   const flash = g.elapsed - g.flashAt < 2.5;
   const cap = g.genOutput + ((g.sw.bj1 || g.sw.bj2) && g.battery > 0 ? g.stats.battOutput : 0);
 
@@ -118,9 +122,9 @@ export function HUD() {
       {paused && (
         <div className="pause" onClick={lockPointer}>
           <div className="pause-box">
-            <h2>PAUSED</h2>
+            <h2>{solo ? 'PAUSED' : 'CLICK TO TAKE CONTROL'}</h2>
             <p>Click anywhere to return to the ship.</p>
-            <p className="dim">The mission clock stops while paused.</p>
+            <p className="dim">{solo ? 'The mission clock stops while paused.' : 'The mission keeps running for your crew.'}</p>
           </div>
         </div>
       )}
