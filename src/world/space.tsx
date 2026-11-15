@@ -31,7 +31,7 @@ function useRealTexture(file: string, srgb = true) {
 }
 
 /** Draw the pictures a moment after the first frame, so the screen never freezes while they are made. */
-function useLater<T>(make: () => T, deps: unknown[]): T | null {
+export function useLater<T>(make: () => T, deps: unknown[]): T | null {
   const [v, setV] = useState<T | null>(null);
   useEffect(() => {
     let dead = false;

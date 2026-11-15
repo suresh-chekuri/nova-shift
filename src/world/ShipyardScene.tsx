@@ -1,10 +1,11 @@
 // The Shipyard: a hangar with the spacecraft on a platform. Click glowing points to pick what to change.
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Stars, Sparkles } from '@react-three/drei';
+import { OrbitControls, Sparkles } from '@react-three/drei';
 import * as THREE from 'three';
 import { SpacecraftModel } from './ShipModel';
 import { EnvRig } from './EnvRig';
+import { Starfield } from './deepspace';
 import { useDesign, useYard, pickHardpoint } from '../store';
 import { computeStats } from '../design';
 
@@ -65,7 +66,7 @@ export function ShipyardScene() {
       <EnvRig intensity={0.5} />
       <spotLight position={[10, 6, 8]} angle={0.7} penumbra={0.9} intensity={250} color="#38bdf8" />
       <spotLight position={[-10, 5, -8]} angle={0.7} penumbra={0.9} intensity={250} color="#f97316" />
-      <Stars radius={90} depth={30} count={1200} factor={3} fade speed={0.2} />
+      <Starfield count={2500} />
 
       {/* platform */}
       <mesh position={[0, -2.4, 0]} receiveShadow>

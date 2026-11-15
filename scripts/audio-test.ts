@@ -21,7 +21,7 @@ function node(kind = ''): any {
 class FakeCtx {
   currentTime = 0; state = 'running'; sampleRate = 8000; destination = node(); listener = node();
   resume() { return Promise.resolve(); }
-  createGain() { return node(); } createDynamicsCompressor() { return node(); } createBiquadFilter() { return node(); } createPanner() { return node(); }
+  createGain() { return node(); } createDynamicsCompressor() { return node(); } createBiquadFilter() { return node(); } createPanner() { return node(); } createConvolver() { return node(); } createBuffer(c, l) { return { getChannelData: () => new Float32Array(l) }; }
   createOscillator() { return node('osc'); } createBufferSource() { return node('src'); }
   createBuffer(_c: number, len: number) { return { getChannelData: () => new Float32Array(len) }; }
 }

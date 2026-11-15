@@ -88,3 +88,8 @@ To use real NASA pictures, see `public/textures/README.md`.
 - `src/world/interior/Hero.tsx` – generator, batteries, science instruments, dish, console screens, coolant pump, tool cart, airlock hatch hardware.
 - `src/world/interior/Rooms.tsx` – per-room equipment (racks, benches, seats, suit lockers).
 - Lighting is in `Lights()` in `src/world/Ship.tsx` (each room has its own tint; emergency lights turn warm red).
+
+## Cinematic space and music
+- **Moon model:** put your GLB at `public/models/moon.glb` (steps in `public/models/README.md`). Without it, the built-in Moon is used.
+- **Space (all made by code):** `src/world/deepspace.tsx` — 7,000 stars (one draw call, fixed to the camera), Milky Way, soft nebulae, galaxies, a ringed planet, a red planet, asteroids, a satellite, a comet, debris. Quality LOW draws fewer stars and skips galaxies and the comet.
+- **Music:** `setMusic` in `src/audio.ts` — drone, pad, shimmer and sparse bells with reverb. No audio files. Volume sliders are in Settings.

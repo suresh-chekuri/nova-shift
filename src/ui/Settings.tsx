@@ -1,9 +1,11 @@
 import { useUI, useSettings, updateSettings, setScreen } from '../store';
 import { sfx } from '../sfx';
+import { useScenery } from '../world/scenery';
 
 export function SettingsScreen() {
   const screen = useUI((s) => s.screen);
   const st = useSettings();
+  const moon = useScenery((x) => x.moon);
   if (screen !== 'settings') return null;
   return (
     <div className="screen sidepanel">
@@ -32,6 +34,7 @@ export function SettingsScreen() {
               <button key={q} className={'btn small ' + (st.quality === q ? 'primary' : '')} onClick={() => { sfx.click(); updateSettings({ quality: q }); }}>{q.toUpperCase()}</button>
             ))}
           </div></div>
+        <div className="tiny">Moon: {moon === 'model' ? 'custom 3D model loaded. Moon (blend) by ThePangel, CC BY 4.0.' : moon === 'fallback' ? 'built-in Moon (no file at public/models/moon.glb).' : 'loading...'}</div>
         <div className="tiny">If the game feels slow on your Mac, set Model detail to LOW, then turn off Shadows, then Glow.</div>
         <button className="btn huge" onClick={() => setScreen('menu')}>BACK</button>
       </div>

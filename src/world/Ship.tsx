@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Stars } from '@react-three/drei';
+import { DeepSpace } from './deepspace';
+import { CustomWindowMoon } from './MoonModel';
 import * as THREE from 'three';
 import { useGame, useSettings, useUI } from '../store';
 import { isEmergency, nextGoal, type GameState, type InstrId } from '../sim';
 import { Instrument } from './ShipModel';
 import { InteriorExtras, ConsoleDetail } from './interior/Rooms';
-import { WindowMoon, WindowEarth, WindowHorizon } from './space';
+import { WindowEarth, WindowHorizon } from './space';
 import { DOOR_LIST, spansAround } from './interior/spots';
 import { Shell, lampMat, accentMat } from './interior/Shell';
 import { Generator, BatteryBank, Spectrometer, SeismicSensor, SignalAnalyzer, HiResCamera, Dish, ConsoleScreen, ContactShadow, CentralDisplay, CoolantPump, ToolCart } from './interior/Hero';
@@ -444,12 +445,12 @@ function Outside() {
   const earthSun = useMemo(() => ({ dir: [270, 8, 140] as [number, number, number], rotY: 0 }), []);
   return (
     <>
-      <Stars radius={260} depth={80} count={5000} factor={6} saturation={0} fade speed={0.4} />
-      <WindowMoon radius={30} position={[0, 8, 95]} sun={moonSun} />
+      <DeepSpace />
+      <CustomWindowMoon radius={30} position={[0, 8, 95]} sun={moonSun} />
       {/* a nearby piece of lunar horizon below the Command Deck window */}
       <WindowHorizon radius={160} position={[0, -150, 60]} />
       {/* the Sun: low in the east, seen through the Science Lab window. Hard white, no atmosphere. */}
-      <mesh position={[270, 22, 20]}><sphereGeometry args={[9, 24, 16]} /><meshBasicMaterial color="#fffaf0" /></mesh>
+      <mesh position={[270, 22, 20]} renderOrder={-50}><sphereGeometry args={[9, 24, 16]} /><meshBasicMaterial color="#fffaf0" /></mesh>
       <mesh position={[270, 22, 20]}><sphereGeometry args={[16, 24, 16]} /><meshBasicMaterial color="#ffe9b8" transparent opacity={0.16} depthWrite={false} /></mesh>
       <WindowEarth radius={14} position={[0, 14, -120]} sun={earthSun} />
     </>

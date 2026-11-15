@@ -534,19 +534,69 @@ function ambTick() {
   else if (roomKey === 'hangar') { tone(70, 0.2, { bus: 'ambient', vol: 0.06, type: 'square', lp: 400 }); noiseBurst(0.4, { bus: 'ambient', f: 1200, vol: 0.015, delay: 0.05 }); }
 }
 
-// ------------------------------------------------------------ music (soft pad)
+// ------------------------------------------------------------ music (slow, layered, made by code)
+// Layers: deep drone, warm pad (chords glide slowly), airy shimmer, and sparse soft bells.
+// Everything goes through a soft reverb. There is no loop point: the sound never restarts, so it never "jumps".
 const CHORDS = [
-  [110, 164.81, 196, 246.94],
-  [87.31, 130.81, 174.61, 220],
-  [130.81, 196, 246.94, 293.66],
-  [98, 146.83, 196, 246.94],
+  [55, 110, 164.81, 220, 329.63],      // Am (open)
+  [43.65, 87.31, 130.81, 174.61, 261.63], // Fmaj7-ish
+  [65.41, 130.81, 196, 246.94, 329.63],   // Cmaj7
+  [49, 98, 146.83, 196, 293.66],          // Gsus
 ];
+const BELL_NOTES = [329.63, 392, 440, 493.88, 587.33, 659.25, 783.99]; // A-minor pentatonic-ish, calm
 let musicBuilt = false;
 let musGain: GainNode | null = null;
+let musIn: GainNode | null = null;       // everything musical enters here (dry + reverb)
 let padOsc: OscillatorNode[] = [];
+let shimOsc: OscillatorNode[] = [];
 let chordIdx = 0;
 let musicMode: 'menu' | 'game' | 'off' = 'off';
 let musicTimer = 0;
+let bellTimer = 0;
+
+/** A soft, dark reverb: noise that fades out over ~4 s, with the highs rolled off. */
+function makeImpulse(c: AudioContext, secs = 4.2) {
+  const len = Math.floor(c.sampleRate * secs);
+  const buf = c.createBuffer(2, len, c.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    let lp = 0;
+    for (let i = 0; i < len; i++) {
+      const env = Math.pow(1 - i / len, 2.6);
+      lp += (Math.random() * 2 - 1 - lp) * 0.18; // one-pole low pass (no harsh highs)
+      d[i] = lp * env;
+    }
+  }
+  return buf;
+}
+function bell(freq: number, vol: number) {
+  const c = ctx;
+  if (!c || !musIn) return;
+  const t = c.currentTime + 0.02;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(vol, t + 0.35);        // soft attack, no click
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 7);   // long tail
+  const o1 = c.createOscillator(); o1.type = 'sine'; o1.frequency.value = freq;
+  const o2 = c.createOscillator(); o2.type = 'sine'; o2.frequency.value = freq * 2.003;
+  const g2 = c.createGain(); g2.gain.value = 0.18;
+  const pan = c.createStereoPanner ? c.createStereoPanner() : null;
+  if (pan) pan.pan.value = Math.random() * 1.2 - 0.6;
+  o1.connect(g); o2.connect(g2).connect(g);
+  if (pan) { g.connect(pan).connect(musIn); } else g.connect(musIn);
+  o1.start(t); o2.start(t); o1.stop(t + 7.2); o2.stop(t + 7.2);
+}
+function scheduleBell() {
+  if (bellTimer) clearTimeout(bellTimer);
+  const wait = (musicMode === 'menu' ? 5000 : 11000) + Math.random() * 9000;
+  bellTimer = window.setTimeout(() => {
+    if (ctx && ctx.state === 'running' && musicMode !== 'off') {
+      bell(BELL_NOTES[Math.floor(Math.random() * BELL_NOTES.length)], musicMode === 'menu' ? 0.05 : 0.03);
+    }
+    scheduleBell();
+  }, wait);
+}
+
 export function setMusic(mode: 'menu' | 'game' | 'off') {
   musicMode = mode;
   const c = ac();
@@ -554,21 +604,46 @@ export function setMusic(mode: 'menu' | 'game' | 'off') {
   if (!musicBuilt) {
     musicBuilt = true;
     musGain = c.createGain(); musGain.gain.value = 0; musGain.connect(mix.mus);
-    const lp = filt('lowpass', 750, 0.5); lp.connect(musGain);
-    lfo(0.05, 300, lp.frequency);
+    musIn = c.createGain(); musIn.gain.value = 1;
+    const tone1 = filt('lowpass', 3200, 0.4);          // keeps the top soft
+    const dry = c.createGain(); dry.gain.value = 0.75;
+    const wet = c.createGain(); wet.gain.value = 0.55;
+    musIn.connect(tone1); tone1.connect(dry).connect(musGain);
+    if (c.createConvolver) { const verb = c.createConvolver(); verb.buffer = makeImpulse(c); tone1.connect(verb).connect(wet).connect(musGain); } // no reverb if the browser lacks it
+
+    // drone: root + fifth, slowly breathing
+    const droneG = c.createGain(); droneG.gain.value = 0.16; droneG.connect(musIn);
+    lfo(0.03, 0.06, droneG.gain);
+    [55, 82.41].forEach((f, i) => { const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = f; o.detune.value = i * 3; o.connect(droneG); o.start(); });
+
+    // pad: five voices, soft filter that opens and closes very slowly
+    const padLp = filt('lowpass', 800, 0.5); padLp.connect(musIn);
+    lfo(0.04, 260, padLp.frequency);
     padOsc = CHORDS[0].map((f, i) => {
-      const o = c.createOscillator(); o.type = i % 2 ? 'sine' : 'triangle'; o.frequency.value = f; o.detune.value = (i - 1.5) * 4;
-      const g = c.createGain(); g.gain.value = 0.18; o.connect(g).connect(lp); o.start();
+      const o = c.createOscillator(); o.type = i % 2 ? 'sine' : 'triangle'; o.frequency.value = f; o.detune.value = (i - 2) * 5;
+      const g = c.createGain(); g.gain.value = 0.11; o.connect(g).connect(padLp); o.start();
       return o;
     });
+
+    // shimmer: very quiet, two octaves up, with slow tremolo
+    const shimG = c.createGain(); shimG.gain.value = 0.02; shimG.connect(musIn);
+    lfo(0.07, 0.015, shimG.gain);
+    shimOsc = CHORDS[0].slice(2).map((f) => {
+      const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = f * 2; o.detune.value = (Math.random() - 0.5) * 8;
+      o.connect(shimG); o.start(); return o;
+    });
+
     musicTimer = window.setInterval(() => {
       if (!ctx || musicMode === 'off') return;
       chordIdx = (chordIdx + 1) % CHORDS.length;
-      padOsc.forEach((o, i) => o.frequency.setTargetAtTime(CHORDS[chordIdx][i], ctx!.currentTime, 2.5));
-      if (musicMode === 'menu' && Math.random() < 0.7) tone([659, 784, 880, 988][Math.floor(Math.random() * 4)], 4, { bus: 'music', vol: 0.02, attack: 0.05 });
-    }, 14000);
+      const t = ctx.currentTime;
+      padOsc.forEach((o, i) => o.frequency.setTargetAtTime(CHORDS[chordIdx][i], t, 3));
+      shimOsc.forEach((o, i) => o.frequency.setTargetAtTime(CHORDS[chordIdx][i + 2] * 2, t, 3));
+    }, 16000);
+    scheduleBell();
   }
-  musGain!.gain.setTargetAtTime(mode === 'menu' ? 0.9 : mode === 'game' ? 0.35 : 0, c.currentTime, 1.5);
+  if (mode !== 'off' && !bellTimer) scheduleBell();
+  musGain!.gain.setTargetAtTime(mode === 'menu' ? 0.9 : mode === 'game' ? 0.35 : 0, c.currentTime, 2);
 }
 
 // ------------------------------------------------------------ 3D listener + room tracking
@@ -693,5 +768,6 @@ export function onLog(level: string) {
 /** Stop timers (used when the page is closed or hot-reloaded). */
 export function disposeAudio() {
   [ambTimer, musicTimer].forEach((t) => t && clearInterval(t));
+  if (bellTimer) { clearTimeout(bellTimer); bellTimer = 0; }
   stopAlarm();
 }

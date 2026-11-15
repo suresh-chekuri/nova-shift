@@ -6,7 +6,7 @@
 
 export interface Sun { dir: [number, number, number]; rotY: number }
 
-function rng(seed: number) {
+export function rng(seed: number) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -24,7 +24,7 @@ function hash3(x: number, y: number, z: number, seed: number) {
   h ^= h >>> 16;
   return (h >>> 0) / 4294967296;
 }
-function noise3(x: number, y: number, z: number, seed: number) {
+export function noise3(x: number, y: number, z: number, seed: number) {
   const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
   const fx = x - ix, fy = y - iy, fz = z - iz;
   const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
@@ -36,7 +36,7 @@ function noise3(x: number, y: number, z: number, seed: number) {
   const y1 = x1 + (x2 - x1) * v, y2 = x3 + (x4 - x3) * v;
   return y1 + (y2 - y1) * w;
 }
-function fbm(x: number, y: number, z: number, oct: number, seed: number) {
+export function fbm(x: number, y: number, z: number, oct: number, seed: number) {
   let s = 0, amp = 0.5, f = 1, norm = 0;
   for (let i = 0; i < oct; i++) {
     s += amp * noise3(x * f, y * f, z * f, seed + i * 17);

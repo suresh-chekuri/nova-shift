@@ -1,10 +1,11 @@
 // Cinematic main-menu background: the spacecraft in orbit around the Moon, Earth in the distance.
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Stars } from '@react-three/drei';
 import * as THREE from 'three';
 import { SpacecraftModel } from './ShipModel';
-import { Moon, Earth } from './space';
+import { Earth } from './space';
+import { Starfield } from './deepspace';
+import { CustomMenuMoon } from './MoonModel';
 import { EnvRig } from './EnvRig';
 import { useDesign, useUI } from '../store';
 
@@ -42,8 +43,8 @@ export function MenuScene() {
       <ambientLight intensity={0.2} color="#8aa4ff" />
       <directionalLight ref={sun} intensity={3.2} color="#fff4e0" />
       <pointLight position={[0, -3, -6]} intensity={30} color="#f97316" distance={14} />
-      <Stars radius={300} depth={100} count={7000} factor={7} saturation={0} fade speed={0.6} />
-      <Moon radius={80} position={[0, -86, 10]} />
+      <Starfield count={6000} />
+      <CustomMenuMoon radius={80} position={[0, -86, 10]} />
       <Earth radius={14} position={[-110, 45, -190]} />
       <group ref={ship}>
         <SpacecraftModel design={design} />
