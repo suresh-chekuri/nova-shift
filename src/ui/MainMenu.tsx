@@ -38,6 +38,10 @@ export function MainMenu() {
           <MenuButton icon={<Cog size={20} />} label="SETTINGS" sub="Sound, look speed, graphics" onClick={() => setScreen('settings')} />
         </div>
       </div>
+      <div className="menu-credits">
+        <span>MADE BY</span>
+        <b>@akhilsrivarma</b><b>@greeshmanth</b><b>@pranaysrivarma</b><b>@srikarkartheek_</b>
+      </div>
       <div className="menu-foot">v2.0 · Press a button to begin</div>
       {ask && (
         <div className="modal">
