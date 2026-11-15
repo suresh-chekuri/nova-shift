@@ -392,3 +392,5 @@ html, body { overscroll-behavior: none; -webkit-touch-callout: none; -webkit-tap
 .menu-credits span { color: var(--amber); letter-spacing: 4px; }
 .menu-credits b { font-weight: 600; color: #e0f2fe; letter-spacing: 1px; }
 @media (max-width: 700px) { .menu-credits { left: 4vw; right: 4vw; bottom: 40px; justify-content: center; font-size: 10px; } }
+
+.menu-credits .menu-ai { flex-basis: 100%; font-style: normal; font-size: 10px; letter-spacing: 3px; color: #7f93ad; margin-top: 2px; }

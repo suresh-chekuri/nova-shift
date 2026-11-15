@@ -41,6 +41,7 @@ export function MainMenu() {
       <div className="menu-credits">
         <span>MADE BY</span>
         <b>@akhilsrivarma</b><b>@greeshmanth</b><b>@pranaysrivarma</b><b>@srikarkartheek_</b>
+        <em className="menu-ai">BUILT WITH HELP FROM CLAUDE · ANTHROPIC</em>
       </div>
       <div className="menu-foot">v2.0 · Press a button to begin</div>
       {ask && (
