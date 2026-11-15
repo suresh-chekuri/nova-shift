@@ -7,118 +7,16 @@ import { isEmergency, nextGoal, type GameState, type InstrId } from '../sim';
 import { Instrument } from './ShipModel';
 import { InteriorExtras, ConsoleDetail } from './interior/Rooms';
 import { WindowMoon, WindowEarth, WindowHorizon } from './space';
-import { LAMP_SPOTS, DOOR_LIST, spansAround } from './interior/spots';
-import { H, WALL_SEGS, FLOOR_RECTS, INTERACTABLES, type Seg } from './layout';
+import { DOOR_LIST, spansAround } from './interior/spots';
+import { Shell, lampMat, accentMat } from './interior/Shell';
+import { Generator, BatteryBank, Spectrometer, SeismicSensor, SignalAnalyzer, HiResCamera, Dish, ConsoleScreen, ContactShadow, CentralDisplay, CoolantPump, ToolCart } from './interior/Hero';
+import { EnvRig } from './EnvRig';
+import { MAT, Inst, Gate, type Item, type V3 } from './interior/kit';
+import { H, INTERACTABLES } from './layout';
 
 const DEG = Math.PI / 180;
 const lerp = THREE.MathUtils.lerp;
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
-
-// ---------- Procedural textures (drawn with code, no image files) ----------
-const canvases: Record<string, HTMLCanvasElement> = {};
-function baseCanvas(kind: 'wall' | 'floor' | 'ceil') {
-  if (canvases[kind]) return canvases[kind];
-  const c = document.createElement('canvas');
-  c.width = c.height = 256;
-  const g = c.getContext('2d')!;
-  const base = kind === 'wall' ? '#b5b9be' : kind === 'floor' ? '#3a3e44' : '#8f949a';
-  g.fillStyle = base;
-  g.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 1500; i++) {
-    g.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '0,0,0'},${Math.random() * 0.06})`;
-    g.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
-  }
-  g.strokeStyle = 'rgba(10,15,25,0.75)';
-  g.lineWidth = 5;
-  g.strokeRect(2, 2, 252, 252);
-  g.lineWidth = 2;
-  g.strokeStyle = 'rgba(10,15,25,0.35)';
-  g.beginPath();
-  g.moveTo(128, 0); g.lineTo(128, 256);
-  g.moveTo(0, 128); g.lineTo(256, 128);
-  g.stroke();
-  g.fillStyle = 'rgba(15,20,30,0.7)';
-  for (const [x, y] of [[14, 14], [242, 14], [14, 242], [242, 242]]) {
-    g.beginPath(); g.arc(x, y, 4, 0, Math.PI * 2); g.fill();
-  }
-  if (kind === 'floor') {
-    g.fillStyle = 'rgba(250,204,21,0.25)';
-    for (let i = 0; i < 8; i++) g.fillRect(8 + i * 30, 240, 14, 8);
-  }
-  canvases[kind] = c;
-  return c;
-}
-function useTiled(kind: 'wall' | 'floor' | 'ceil', rx: number, ry: number) {
-  return useMemo(() => {
-    const t = new THREE.CanvasTexture(baseCanvas(kind));
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 4;
-    t.repeat.set(Math.max(1, rx), Math.max(1, ry));
-    return t;
-  }, [kind, rx, ry]);
-}
-
-// One shared material for ceiling lamps. The lights controller changes its color.
-const lampMat = new THREE.MeshStandardMaterial({ color: '#eef3f8', emissive: new THREE.Color('#e6eef7'), emissiveIntensity: 2 });
-
-// ---------- Walls, floors, ceilings ----------
-function WallSeg({ s }: { s: Seg }) {
-  const long = Math.max(s.w, s.d);
-  const tex = useTiled('wall', long / 2.5, H / 2.5);
-  const alongX = s.w > s.d;
-  if (!s.win) {
-    return (
-      <mesh position={[s.cx, H / 2, s.cz]}>
-        <boxGeometry args={[s.w, H, s.d]} />
-        <meshStandardMaterial map={tex} roughness={0.7} metalness={0.3} />
-      </mesh>
-    );
-  }
-  const n = Math.max(1, Math.round(long / 3.5));
-  const posts = Array.from({ length: n + 1 }, (_, i) => -long / 2 + (i * long) / n);
-  return (
-    <group position={[s.cx, 0, s.cz]}>
-      <mesh position={[0, 0.5, 0]}>
-        <boxGeometry args={[s.w, 1, s.d]} />
-        <meshStandardMaterial map={tex} roughness={0.7} metalness={0.3} />
-      </mesh>
-      <mesh position={[0, H - 0.5, 0]}>
-        <boxGeometry args={[s.w, 1, s.d]} />
-        <meshStandardMaterial map={tex} roughness={0.7} metalness={0.3} />
-      </mesh>
-      <mesh position={[0, 2, 0]}>
-        <boxGeometry args={alongX ? [s.w, 2, 0.05] : [0.05, 2, s.d]} />
-        <meshStandardMaterial color="#9cd1ff" transparent opacity={0.1} roughness={0.1} depthWrite={false} />
-      </mesh>
-      {posts.map((p, i) => (
-        <mesh key={i} position={alongX ? [p, 2, 0] : [0, 2, p]}>
-          <boxGeometry args={alongX ? [0.22, 2, s.d + 0.05] : [s.w + 0.05, 2, 0.22]} />
-          <meshStandardMaterial color="#4a4f57" roughness={0.6} metalness={0.5} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-function FloorCeil({ r, lift = 0 }: { r: { x0: number; x1: number; z0: number; z1: number }; lift?: number }) {
-  const w = r.x1 - r.x0, d = r.z1 - r.z0;
-  const floor = useTiled('floor', w / 2, d / 2);
-  const ceil = useTiled('ceil', w / 3, d / 3);
-  const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
-  return (
-    <>
-      <mesh position={[cx, lift, cz]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[w + 0.4, d + 0.4]} />
-        <meshStandardMaterial map={floor} roughness={0.6} metalness={0.4} />
-      </mesh>
-      <mesh position={[cx, H - lift, cz]} rotation={[Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[w + 0.4, d + 0.4]} />
-        <meshStandardMaterial map={ceil} roughness={0.8} metalness={0.2} />
-      </mesh>
-    </>
-  );
-}
 
 function Trim({ r, color }: { r: { x0: number; x1: number; z0: number; z1: number }; color: string }) {
   const m = <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.45} />;
@@ -137,25 +35,6 @@ function Trim({ r, color }: { r: { x0: number; x1: number; z0: number; z1: numbe
   add(false, r.x0 + 0.25, r.z0 + 0.25, r.z1 - 0.25, r.x0, 'w');
   add(false, r.x1 - 0.25, r.z0 + 0.25, r.z1 - 0.25, r.x1, 'e');
   return <group>{strips}</group>;
-}
-
-function CeilingLamps() {
-  return (
-    <>
-      {LAMP_SPOTS.map(([x, z, w, d], i) => (
-        <group key={i}>
-          <mesh position={[x, H - 0.04, z]} material={lampMat}>
-            <boxGeometry args={[w, 0.06, d]} />
-          </mesh>
-          {/* dark housing frame around each light panel */}
-          <mesh position={[x, H - 0.025, z]}>
-            <boxGeometry args={[w + 0.14, 0.04, d + 0.14]} />
-            <meshStandardMaterial color="#2c3036" roughness={0.6} metalness={0.5} />
-          </mesh>
-        </group>
-      ))}
-    </>
-  );
 }
 
 // ---------- Pipes and conduits ----------
@@ -222,31 +101,28 @@ function Lamp({ pos, size = 0.07, get }: { pos: [number, number, number]; size?:
   );
 }
 
+const KEYS = new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: new THREE.Color('#3a3a3a'), emissiveIntensity: 0.6, roughness: 0.5, metalness: 0.2 });
+const KEY_COLORS = ['#c9951c', '#8fb7c9', '#8fbf6a'];
+
 function Console({ x, z, rotY = 0, w = 3, color = '#38bdf8', title, children }: { x: number; z: number; rotY?: number; w?: number; color?: string; title?: string; children?: ReactNode }) {
-  const scr = useRef<THREE.MeshStandardMaterial>(null!);
-  useFrame(({ clock }) => {
-    if (scr.current) scr.current.emissiveIntensity = 0.9 + Math.sin(clock.elapsedTime * 3 + x) * 0.15;
-  });
+  const n = Math.max(3, Math.floor(w * 2.5));
+  const keys = useMemo<Item[]>(() => Array.from({ length: n }, (_, i) => ({ p: [(i - (n - 1) / 2) * 0.28, 1.07, 0.3] as V3, s: [0.14, 0.05, 0.1] as V3, c: KEY_COLORS[i % 3] })), [n]);
+  // x and z are world positions: the screen skips redrawing when the player is far away
+  const rx = x, rz = z;
   return (
     <group position={[x, 0, z]} rotation={[0, rotY, 0]}>
-      <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
+      <ContactShadow p={[0, 0, 0.1]} w={w + 1} d={2.2} />
+      <mesh position={[0, 0.5, 0]} castShadow receiveShadow material={MAT.paintGrey}>
         <boxGeometry args={[w, 1, 1]} />
-        <meshStandardMaterial color="#4a4f57" metalness={0.5} roughness={0.5} />
       </mesh>
-      <mesh position={[0, 1.02, 0.2]}>
+      <mesh position={[0, 1.02, 0.2]} material={MAT.comp}>
         <boxGeometry args={[w - 0.2, 0.06, 0.5]} />
-        <meshStandardMaterial color="#22272d" metalness={0.6} roughness={0.4} />
       </mesh>
-      <mesh position={[0, 1.4, -0.2]} rotation={[-0.45, 0, 0]}>
+      <mesh position={[0, 1.4, -0.2]} rotation={[-0.45, 0, 0]} material={MAT.black}>
         <boxGeometry args={[w - 0.3, 0.75, 0.06]} />
-        <meshStandardMaterial ref={scr} color="#06202c" emissive={color} emissiveIntensity={1} />
       </mesh>
-      {Array.from({ length: Math.max(3, Math.floor(w * 2.5)) }, (_, i) => (
-        <mesh key={i} position={[(i - (Math.max(3, Math.floor(w * 2.5)) - 1) / 2) * 0.28, 1.07, 0.3]}>
-          <boxGeometry args={[0.14, 0.05, 0.1]} />
-          <meshStandardMaterial color={i % 3 === 0 ? '#c9951c' : i % 3 === 1 ? '#8fb7c9' : '#8fbf6a'} emissive={i % 3 === 0 ? '#c9951c' : i % 3 === 1 ? '#5f9db5' : '#6fa04a'} emissiveIntensity={0.55} />
-        </mesh>
-      ))}
+      <ConsoleScreen w={w} color={color} x={rx} z={rz} />
+      <Inst items={keys} mat={KEYS} />
       <ConsoleDetail w={w} title={title} />
       {children}
     </group>
@@ -274,6 +150,7 @@ function CommandProps() {
     <>
       <Console x={0} z={4.2} rotY={Math.PI} w={5} color="#38bdf8" title="MISSION COMMAND" />
       <NavHologram />
+      <CentralDisplay />
       <Console x={-5} z={4.5} rotY={Math.PI} w={2.6} color="#a78bfa" title="SHIP STATUS">
         <Bar x={-0.9} color="#facc15" get={(g) => (g.genOutput ? g.demand / g.genOutput : 0)} />
         <Bar x={-0.45} color="#22c55e" get={(g) => g.battery / 100} />
@@ -314,68 +191,6 @@ function TimerBar() {
 }
 
 // ---------- Engineering ----------
-function Generator() {
-  const core = useRef<THREE.MeshStandardMaterial>(null!);
-  const rotor = useRef<THREE.Group>(null!);
-  useFrame(({ clock }, dt) => {
-    const g = useGame.getState();
-    const t = clock.elapsedTime;
-    const on = g.genState === 'online', st = g.genState === 'starting';
-    const col = on ? '#38bdf8' : st ? '#fb923c' : '#ef4444';
-    if (core.current) {
-      core.current.color.set(col);
-      core.current.emissive.set(col);
-      core.current.emissiveIntensity = on ? 1.8 : st ? 1.2 + Math.sin(t * 22) * 0.9 : 0.5 + Math.sin(t * 3) * 0.3;
-    }
-    if (rotor.current) rotor.current.rotation.y += dt * (on ? 5 : st ? 2.5 : 0);
-  });
-  return (
-    <group position={[-27, 0, -2.8]}>
-      <mesh position={[0, 0.2, 0]}><cylinderGeometry args={[1.5, 1.6, 0.4, 24]} /><meshStandardMaterial color="#4a4f57" metalness={0.6} roughness={0.5} /></mesh>
-      <mesh position={[0, 1.4, 0]} castShadow><cylinderGeometry args={[1.1, 1.2, 2, 24]} /><meshStandardMaterial color="#5a6069" metalness={0.6} roughness={0.45} /></mesh>
-      <mesh position={[0, 2.5, 0]}><cylinderGeometry args={[1.25, 1.1, 0.3, 24]} /><meshStandardMaterial color="#4a4f57" metalness={0.6} roughness={0.5} /></mesh>
-      <group ref={rotor} position={[0, 1.5, 0]}>
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[1.18, 0.1, 10, 32]} />
-          <meshStandardMaterial ref={core} color="#ef4444" emissive="#ef4444" emissiveIntensity={1} />
-        </mesh>
-        <mesh position={[1.18, 0, 0]}><boxGeometry args={[0.2, 0.3, 0.2]} /><meshStandardMaterial color="#cbd5e1" metalness={0.7} /></mesh>
-      </group>
-    </group>
-  );
-}
-
-function BatteryBank() {
-  const fills = useRef<THREE.Mesh[]>([]);
-  useFrame(() => {
-    const g = useGame.getState();
-    const lvl = g.battery / 100 * 5;
-    fills.current.forEach((m, i) => {
-      if (!m) return;
-      const f = clamp01(lvl - i);
-      m.scale.y = Math.max(0.02, f);
-      const mat = m.material as THREE.MeshStandardMaterial;
-      const c = g.battery < 20 ? '#ef4444' : '#22c55e';
-      mat.color.set(c); mat.emissive.set(c);
-    });
-  });
-  return (
-    <group position={[-27, 0, 3.2]}>
-      {Array.from({ length: 5 }, (_, i) => (
-        <group key={i} position={[-2 + i * 1, 0, 0]}>
-          <mesh position={[0, 0.8, 0]} castShadow><boxGeometry args={[0.85, 1.6, 1.4]} /><meshStandardMaterial color="#4a4f57" metalness={0.6} roughness={0.5} /></mesh>
-          <group position={[0, 0.15, -0.72]}>
-            <mesh ref={(el) => { if (el) fills.current[i] = el; }} position={[0, 0.65, 0]}>
-              <boxGeometry args={[0.55, 1.3, 0.05]} />
-              <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={1.5} />
-            </mesh>
-          </group>
-        </group>
-      ))}
-    </group>
-  );
-}
-
 const SW_LAMPS: [string, number][] = [['gj1', 0], ['gj2', 1], ['bj1', 2], ['bj2', 3], ['life', 4], ['comms', 5], ['sci', 6], ['eng', 7]];
 
 function EngineeringProps() {
@@ -384,6 +199,7 @@ function EngineeringProps() {
       <Generator />
       <BatteryBank />
       <EngineeringExtras />
+      <Gate cx={-27} cz={0} r={12}><CoolantPump /><ToolCart /></Gate>
       <Console x={-22} z={-5.3} rotY={0} w={4} color="#facc15" title="POWER DISTRIBUTION">
         {SW_LAMPS.map(([id, i]) => (
           <Lamp key={id} pos={[-1.4 + i * 0.4, 1.12, 0.32]} size={0.06} get={(g) => (g.sw[id as keyof typeof g.sw] ? '#22d3ee' : '#3d434b')} />
@@ -398,105 +214,6 @@ function EngineeringProps() {
 }
 
 // ---------- Science lab ----------
-function useInstrState(id: InstrId) {
-  const color = useRef(new THREE.Color());
-  return (g: GameState, t: number) => {
-    if (g.running[id]) return { on: true, c: color.current.set('#34d399') };
-    if (g.instruments[id]) return { on: false, c: color.current.set('#ef4444') };
-    return { on: false, c: color.current.set('#f59e0b').multiplyScalar(0.35) };
-  };
-}
-
-function Spectrometer() {
-  const head = useRef<THREE.Group>(null!);
-  const mat = useRef<THREE.MeshStandardMaterial>(null!);
-  const beam = useRef<THREE.Mesh>(null!);
-  const st = useInstrState('spectrometer');
-  useFrame(({ clock }, dt) => {
-    const g = useGame.getState();
-    const s = st(g, clock.elapsedTime);
-    if (head.current && s.on) head.current.rotation.y += dt * 0.9;
-    if (mat.current) { mat.current.emissive.copy(s.c); mat.current.emissiveIntensity = s.on ? 1.6 : 1; }
-    if (beam.current) beam.current.visible = s.on;
-  });
-  return (
-    <group position={[21, 0, -3.8]}>
-      <mesh position={[0, 0.45, 0]}><cylinderGeometry args={[0.7, 0.8, 0.9, 20]} /><meshStandardMaterial color="#4a4f57" metalness={0.6} roughness={0.5} /></mesh>
-      <mesh position={[0, 1.2, 0]}><cylinderGeometry args={[0.12, 0.12, 0.7, 10]} /><meshStandardMaterial color="#64748b" metalness={0.7} /></mesh>
-      <group ref={head} position={[0, 1.7, 0]}>
-        <mesh><boxGeometry args={[0.5, 0.45, 1.0]} /><meshStandardMaterial color="#5a6069" metalness={0.6} roughness={0.4} /></mesh>
-        <mesh position={[0, 0, 0.6]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.18, 0.22, 0.3, 14]} /><meshStandardMaterial ref={mat} color="#111827" emissive="#f59e0b" emissiveIntensity={1} /></mesh>
-        <mesh ref={beam} position={[0, -0.2, 1.4]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.02, 0.02, 1.6, 6]} /><meshStandardMaterial color="#34d399" emissive="#34d399" emissiveIntensity={2} transparent opacity={0.6} /></mesh>
-      </group>
-    </group>
-  );
-}
-
-function SeismicSensor() {
-  const rings = useRef<THREE.Mesh[]>([]);
-  const mat = useRef<THREE.MeshStandardMaterial>(null!);
-  const st = useInstrState('seismic');
-  useFrame(({ clock }) => {
-    const g = useGame.getState();
-    const t = clock.elapsedTime;
-    const s = st(g, t);
-    rings.current.forEach((m, i) => {
-      if (!m) return;
-      const k = s.on ? 1 + 0.12 * Math.sin(t * 7 - i * 1.2) : 1;
-      m.scale.set(k, k, 1);
-    });
-    if (mat.current) { mat.current.emissive.copy(s.c); mat.current.emissiveIntensity = s.on ? 1.8 : 1; }
-  });
-  return (
-    <group position={[26.5, 0, -3.8]}>
-      <mesh position={[0, 0.06, 0]}><cylinderGeometry args={[0.85, 0.9, 0.12, 20]} /><meshStandardMaterial color="#4a4f57" metalness={0.6} /></mesh>
-      {[0, 1, 2].map((i) => (
-        <mesh key={i} position={[Math.cos(i * 2.094) * 0.6, 0.25, Math.sin(i * 2.094) * 0.6]} rotation={[Math.PI, 0, 0]}>
-          <coneGeometry args={[0.08, 0.35, 8]} /><meshStandardMaterial color="#94a3b8" metalness={0.7} />
-        </mesh>
-      ))}
-      <mesh position={[0, 0.7, 0]}><cylinderGeometry args={[0.25, 0.3, 1.1, 14]} /><meshStandardMaterial color="#5a6069" metalness={0.6} roughness={0.4} /></mesh>
-      <mesh position={[0, 1.35, 0]}><sphereGeometry args={[0.22, 14, 14]} /><meshStandardMaterial ref={mat} color="#111827" emissive="#f59e0b" emissiveIntensity={1} /></mesh>
-      {[0, 1, 2].map((i) => (
-        <mesh key={i} ref={(el) => { if (el) rings.current[i] = el; }} position={[0, 0.5 + i * 0.3, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[0.42 + i * 0.04, 0.025, 8, 28]} /><meshStandardMaterial color="#94a3b8" metalness={0.7} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-function SignalAnalyzer() {
-  const ring = useRef<THREE.Mesh>(null!);
-  const ring2 = useRef<THREE.Mesh>(null!);
-  const core = useRef<THREE.MeshStandardMaterial>(null!);
-  const st = useInstrState('analyzer');
-  useFrame(({ clock }, dt) => {
-    const g = useGame.getState();
-    const s = st(g, clock.elapsedTime);
-    if (s.on) {
-      if (ring.current) ring.current.rotation.x += dt * 1.8;
-      if (ring2.current) ring2.current.rotation.z += dt * 1.2;
-    }
-    if (core.current) { core.current.emissive.copy(s.c); core.current.emissiveIntensity = s.on ? 1.6 + Math.sin(clock.elapsedTime * 8) * 0.6 : 1; }
-  });
-  return (
-    <group position={[26.5, 0, 3.8]}>
-      <mesh position={[0, 0.4, 0]}><cylinderGeometry args={[0.9, 1.0, 0.8, 24]} /><meshStandardMaterial color="#4a4f57" metalness={0.6} roughness={0.5} /></mesh>
-      <mesh position={[0, 1.0, 0]}><cylinderGeometry args={[0.15, 0.15, 0.6, 10]} /><meshStandardMaterial color="#64748b" metalness={0.7} /></mesh>
-      <mesh ref={ring} position={[0, 1.7, 0]}><torusGeometry args={[0.7, 0.05, 10, 36]} /><meshStandardMaterial color="#94a3b8" metalness={0.7} /></mesh>
-      <mesh ref={ring2} position={[0, 1.7, 0]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[0.55, 0.04, 10, 36]} /><meshStandardMaterial color="#cbd5e1" metalness={0.7} /></mesh>
-      <mesh position={[0, 1.7, 0]}><sphereGeometry args={[0.22, 16, 16]} /><meshStandardMaterial ref={core} color="#111827" emissive="#f59e0b" emissiveIntensity={1} /></mesh>
-      {[0, 1, 2].map((i) => (
-        <mesh key={i} position={[Math.cos(i * 2.094 + 0.5) * 0.7, 0.9, Math.sin(i * 2.094 + 0.5) * 0.7]} rotation={[-0.9, -(i * 2.094 + 0.5) + Math.PI / 2, 0]}>
-          <sphereGeometry args={[0.25, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2.4]} />
-          <meshStandardMaterial color="#cbd5e1" metalness={0.6} side={THREE.DoubleSide} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
 function Installed({ id, x, z, children }: { id: string; x: number; z: number; children: ReactNode }) {
   const grp = useRef<THREE.Group>(null!);
   const pad = useRef<THREE.Group>(null!);
@@ -513,38 +230,6 @@ function Installed({ id, x, z, children }: { id: string; x: number; z: number; c
         <mesh rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[0.55, 28]} /><meshStandardMaterial color="#22272d" /></mesh>
       </group>
     </>
-  );
-}
-
-function HiResCamera() {
-  const head = useRef<THREE.Group>(null!);
-  const lens = useRef<THREE.MeshStandardMaterial>(null!);
-  const beam = useRef<THREE.Mesh>(null!);
-  useFrame(({ clock }) => {
-    const g = useGame.getState();
-    const on = g.running.camera;
-    if (head.current) head.current.rotation.y = Math.PI * 1.5 + (on ? Math.sin(clock.elapsedTime * 0.8) * 0.5 : 0);
-    if (lens.current) {
-      const c = on ? '#60a5fa' : g.instruments.camera ? '#ef4444' : '#f59e0b';
-      lens.current.emissive.set(c);
-      lens.current.emissiveIntensity = on ? 2 : 0.7;
-    }
-    if (beam.current) beam.current.visible = on && Math.sin(clock.elapsedTime * 12) > -0.3;
-  });
-  return (
-    <group position={[29.4, 0, 0]}>
-      <mesh position={[0, 0.45, 0]}><cylinderGeometry args={[0.55, 0.65, 0.9, 20]} /><meshStandardMaterial color="#4a4f57" metalness={0.6} roughness={0.5} /></mesh>
-      {[0, 1, 2].map((i) => (
-        <mesh key={i} position={[Math.cos(i * 2.094) * 0.3, 1.2, Math.sin(i * 2.094) * 0.3]} rotation={[Math.sin(i * 2.094) * 0.3, 0, -Math.cos(i * 2.094) * 0.3]}>
-          <cylinderGeometry args={[0.025, 0.025, 0.9, 6]} /><meshStandardMaterial color="#94a3b8" metalness={0.8} />
-        </mesh>
-      ))}
-      <group ref={head} position={[0, 1.75, 0]}>
-        <mesh><boxGeometry args={[0.5, 0.4, 0.7]} /><meshStandardMaterial color="#2a2e34" metalness={0.7} roughness={0.4} /></mesh>
-        <mesh position={[0, 0, 0.5]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.16, 0.2, 0.4, 16]} /><meshStandardMaterial ref={lens} color="#0f172a" emissive="#f59e0b" emissiveIntensity={0.7} /></mesh>
-        <mesh ref={beam} position={[0, 0, 1.4]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.01, 0.01, 1.8, 6]} /><meshStandardMaterial color="#60a5fa" emissive="#60a5fa" emissiveIntensity={3} transparent opacity={0.7} /></mesh>
-      </group>
-    </group>
   );
 }
 
@@ -600,37 +285,6 @@ function SciHologram() {
       <icosahedronGeometry args={[0.4, 1]} />
       <meshBasicMaterial ref={mat} wireframe transparent opacity={0.7} />
     </mesh>
-  );
-}
-
-function Ribs() {
-  const ribs: [number, number][] = [];
-  for (const [cx, w] of [[-24, 14], [24, 14]] as const) {
-    for (const k of [-5.25, -1.75, 1.75, 5.25]) {
-      ribs.push([cx + k, -5.72]);
-      ribs.push([cx + k, 5.72]);
-    }
-  }
-  const beams: [number, number, number, number][] = [];
-  for (const [cx, cz, w, d] of [[0, 0, 14, 12], [-24, 0, 14, 12], [24, 0, 14, 12], [0, -24, 14, 14]] as const) {
-    for (const k of [-3.5, 0, 3.5]) beams.push([cx + k, cz, 0.3, d]);
-  }
-  return (
-    <>
-      {ribs.map(([x, z], i) => (
-        <group key={i} position={[x, 2, z]}>
-          <mesh><boxGeometry args={[0.4, 4, 0.2]} /><meshStandardMaterial color="#5a6069" metalness={0.7} roughness={0.45} /></mesh>
-          <mesh position={[0, 0, z > 0 ? -0.11 : 0.11]}><boxGeometry args={[0.04, 3.6, 0.02]} /><meshStandardMaterial color="#8fb3c4" emissive="#8fb3c4" emissiveIntensity={0.25} /></mesh>
-        </group>
-      ))}
-      {beams.map(([x, z, w, d], i) => (
-        <mesh key={i} position={[x, H - 0.17, z]}><boxGeometry args={[w, 0.3, d]} /><meshStandardMaterial color="#555b64" metalness={0.7} roughness={0.5} /></mesh>
-      ))}
-      {/* dark strips at the foot of the walls: cheap fake ambient occlusion */}
-      {[[0, -5.8, 14, 0.1], [0, 5.8, 14, 0.1], [-24, -5.8, 14, 0.1], [-24, 5.8, 14, 0.1], [24, -5.8, 14, 0.1], [24, 5.8, 14, 0.1], [0, -30.8, 14, 0.1], [-6.8, -24, 0.1, 14], [6.8, -24, 0.1, 14]].map(([x, z, w, d], i) => (
-        <mesh key={'ao' + i} position={[x, 0.12, z]}><boxGeometry args={[w, 0.24, d]} /><meshStandardMaterial color="#10161f" roughness={0.9} /></mesh>
-      ))}
-    </>
   );
 }
 
@@ -693,44 +347,6 @@ function ScienceProps() {
   );
 }
 
-// ---------- Communications ----------
-function Dish() {
-  const yaw = useRef<THREE.Group>(null!);
-  const tilt = useRef<THREE.Group>(null!);
-  const beam = useRef<THREE.Mesh>(null!);
-  const az = useRef(0), el = useRef(45);
-  useFrame(({ clock }, dt) => {
-    const g = useGame.getState();
-    const k = Math.min(1, dt * 4);
-    az.current += (g.antenna.az - az.current) * k;
-    el.current += (g.antenna.el - el.current) * k;
-    const shake = g.antennaFault ? Math.sin(clock.elapsedTime * 30) * 0.05 : 0;
-    if (yaw.current) yaw.current.rotation.y = Math.PI - az.current * DEG + shake;
-    if (tilt.current) tilt.current.rotation.x = (90 - el.current) * DEG;
-    if (beam.current) {
-      beam.current.visible = g.commsLinked;
-      (beam.current.material as THREE.MeshStandardMaterial).emissiveIntensity = g.transmitting ? 2.5 + Math.sin(clock.elapsedTime * 14) : 1.2;
-    }
-  });
-  return (
-    <group position={[-3.5, 0, -25.5]}>
-      <mesh position={[0, 0.5, 0]} castShadow><cylinderGeometry args={[0.8, 1, 1, 20]} /><meshStandardMaterial color="#4a4f57" metalness={0.6} roughness={0.5} /></mesh>
-      <mesh position={[0, 1.2, 0]}><cylinderGeometry args={[0.15, 0.15, 0.8, 10]} /><meshStandardMaterial color="#64748b" metalness={0.7} /></mesh>
-      <group ref={yaw} position={[0, 1.6, 0]}>
-        <group ref={tilt}>
-          <mesh rotation={[0, 0, 0]}>
-            <sphereGeometry args={[1.0, 32, 12, 0, Math.PI * 2, (Math.PI * 2) / 3, Math.PI / 3]} />
-            <meshStandardMaterial color="#e2e8f0" metalness={0.5} roughness={0.35} side={THREE.DoubleSide} />
-          </mesh>
-          <mesh position={[0, 0.6, 0]}><cylinderGeometry args={[0.025, 0.025, 1.2, 6]} /><meshStandardMaterial color="#94a3b8" metalness={0.8} /></mesh>
-          <mesh position={[0, 1.2, 0]}><sphereGeometry args={[0.08, 10, 10]} /><meshStandardMaterial color="#22d3ee" emissive="#22d3ee" emissiveIntensity={1.5} /></mesh>
-          <mesh ref={beam} position={[0, 2.4, 0]}><cylinderGeometry args={[0.04, 0.04, 2.4, 8]} /><meshStandardMaterial color="#38bdf8" emissive="#38bdf8" emissiveIntensity={1.2} transparent opacity={0.45} /></mesh>
-        </group>
-      </group>
-    </group>
-  );
-}
-
 function CommsProps() {
   return (
     <>
@@ -763,6 +379,9 @@ function RoomSpot({ p, shadows }: { p: [number, number, number]; shadows: boolea
   );
 }
 
+// One tint per room light, so each room has its own mood (all stay close to white).
+const LIGHT_TINT = ['#ffe9c8', '#e4efff', '#fff0dc', '#e6fff4', '#ece6ff', '#eaf0f7'];
+
 function Lights() {
   const amb = useRef<THREE.AmbientLight>(null!);
   const hemi = useRef<THREE.HemisphereLight>(null!);
@@ -770,9 +389,15 @@ function Lights() {
   const flash = useRef<THREE.PointLight>(null!);
   const mix = useRef(1);
   const shadows = useSettings((s) => s.shadows);
+  const quality = useSettings((s) => s.quality);
+  const withEnv = quality !== 'low'; // reflections add light, so the flat fill light is lower
+  const tints = useMemo(() => LIGHT_TINT.map((c) => new THREE.Color(c)), []);
   const cur = useMemo(() => new THREE.Color(), []);
+  const cLamp = useMemo(() => new THREE.Color(), []);
   const cNormal = useMemo(() => new THREE.Color('#eaf0f7'), []);
-  const cEmer = useMemo(() => new THREE.Color('#ff3b30'), []);
+  const cEmer = useMemo(() => new THREE.Color('#ff4a1c'), []);   // warm emergency light
+  const cBlue = useMemo(() => new THREE.Color('#4aa3ff'), []);
+  const cAmber = useMemo(() => new THREE.Color('#ff8a3c'), []);
   useFrame(({ clock, camera }, dt) => {
     const g = useGame.getState();
     const em = g.phase === 'won' ? false : g.phase === 'lost' ? true : isEmergency(g);
@@ -782,23 +407,26 @@ function Lights() {
     const pulse = 0.65 + 0.35 * Math.sin(t * 4.5);
     cur.copy(cNormal).lerp(cEmer, m);
     const boost = g.elapsed - g.flashAt < 1.5 ? 1.4 : 1;
-    pts.current.forEach((p) => {
+    pts.current.forEach((p, i) => {
       if (!p) return;
-      p.color.copy(cur);
+      p.color.copy(tints[i % tints.length]).lerp(cEmer, m);
       p.intensity = lerp(80, 55 * pulse, m) * boost;
     });
-    if (amb.current) amb.current.intensity = lerp(1.2, 0.55, m);
-    if (hemi.current) hemi.current.intensity = lerp(0.9, 0.35, m);
-    lampMat.emissive.copy(cur);
+    if (amb.current) amb.current.intensity = lerp(withEnv ? 0.85 : 1.2, 0.55, m);
+    if (hemi.current) hemi.current.intensity = lerp(withEnv ? 0.6 : 0.9, 0.35, m);
+    cLamp.copy(cNormal).lerp(cEmer, m);
+    lampMat.emissive.copy(cLamp);
     lampMat.emissiveIntensity = lerp(2.2, 0.5 + 1.3 * pulse, m);
+    accentMat.emissive.copy(cBlue).lerp(cAmber, m);
+    accentMat.emissiveIntensity = lerp(1.0, 0.7 + 0.5 * pulse, m);
     if (flash.current) flash.current.position.copy(camera.position);
   });
   return (
     <>
       <ambientLight ref={amb} intensity={0.6} color="#b4bdca" />
-      <hemisphereLight ref={hemi} args={['#c9d3e0', '#2a2d33', 0.6]} />
+      <hemisphereLight ref={hemi} args={['#cfd8e6', '#2f333a', 0.6]} />
       {LIGHT_POS.map((p, i) => (
-        <pointLight key={i} ref={(el) => { if (el) pts.current[i] = el; }} position={p} distance={26} decay={2} intensity={60} color="#eaf0f7" />
+        <pointLight key={i} ref={(el) => { if (el) pts.current[i] = el; }} position={p} distance={26} decay={2} intensity={60} color={LIGHT_TINT[i]} />
       ))}
       <pointLight ref={flash} intensity={9} distance={9} decay={2} color="#e0f2fe" />
       {/* shadow lights only exist when Shadows is ON (unused lights still cost speed) */}
@@ -855,17 +483,15 @@ export function Ship() {
   return (
     <group>
       <Lights />
+      <EnvRig intensity={0.5} />
       <Outside />
-      {WALL_SEGS.map((s, i) => <WallSeg key={i} s={s} />)}
-      {FLOOR_RECTS.map((r, i) => <FloorCeil key={i} r={r} lift={i >= 4 ? 0.012 : 0} />)}
+      <Shell />
       <Trim r={{ x0: -7, x1: 7, z0: -6, z1: 6 }} color="#5aa7c7" />
       <Trim r={{ x0: -31, x1: -17, z0: -6, z1: 6 }} color="#c98a3d" />
       <Trim r={{ x0: 17, x1: 31, z0: -6, z1: 6 }} color="#5fae8c" />
       <Trim r={{ x0: -7, x1: 7, z0: -31, z1: -17 }} color="#8b7fc7" />
       <Trim r={{ x0: -28.5, x1: -22.5, z0: 6, z1: 13 }} color="#d1a23a" />
-      <CeilingLamps />
       <Conduits />
-      <Ribs />
       <InteriorExtras />
       <CommandProps />
       <EngineeringProps />

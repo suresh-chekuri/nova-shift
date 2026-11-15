@@ -32,28 +32,40 @@ export function Gate({ cx, cz, r, children }: { cx: number; cz: number; r: numbe
 // ------------------------------------------------------------------ materials
 // A restrained NASA look: painted aluminium, brushed steel, dark composite,
 // rubber, thermal foil and glass. Colour comes from small lights and screens only.
-const mk = (color: string, roughness = 0.5, metalness = 0.5, extra: THREE.MeshStandardMaterialParameters = {}) =>
-  new THREE.MeshStandardMaterial({ color, roughness, metalness, ...extra });
+import { brushedMap, speckleMap, crinkleMap, weaveMap } from './pbr';
+type Grain = 'brushed' | 'paint' | 'foil' | 'rubber' | 'none';
+const grains: Record<Grain, (() => THREE.Texture) | null> = { brushed: brushedMap, paint: speckleMap, foil: crinkleMap, rubber: weaveMap, none: null };
+const gScale: Record<Grain, number> = { brushed: 0.9, paint: 0.55, foil: 1.5, rubber: 0.5, none: 0 };
+// Each material gets a bump map and a roughness map, so surfaces catch light unevenly (brushed streaks, paint grain, foil creases).
+const mk = (color: string, roughness = 0.5, metalness = 0.5, grain: Grain = 'none', extra: THREE.MeshStandardMaterialParameters = {}) => {
+  const make = grains[grain];
+  const maps: THREE.MeshStandardMaterialParameters = {};
+  if (make) {
+    const t = make().clone(); t.needsUpdate = true; t.repeat.set(2.5, 2.5);
+    maps.bumpMap = t; maps.bumpScale = gScale[grain]; maps.roughnessMap = t;
+  }
+  return new THREE.MeshStandardMaterial({ color, roughness, metalness, ...maps, ...extra });
+};
 export const MAT = {
-  steel: mk('#9aa1a9', 0.34, 0.85),          // brushed stainless / aluminium
-  darkSteel: mk('#4b5058', 0.45, 0.8),
-  paint: mk('#c4c7cb', 0.6, 0.25),           // painted aluminium (off-white)
-  paintGrey: mk('#7b8189', 0.6, 0.3),
-  paintDark: mk('#3a3f46', 0.65, 0.3),
-  comp: mk('#1c2025', 0.5, 0.4),             // carbon composite
-  rubber: mk('#15171a', 0.95, 0),
-  foil: mk('#b8923f', 0.32, 0.92),           // gold thermal insulation (MLI)
-  foilSilver: mk('#b5bac0', 0.3, 0.92),
-  white: mk('#ffffff', 0.6, 0.2),            // base for instanced colours
-  suit: mk('#e6e6e2', 0.75, 0.05),           // EVA suit fabric
-  visor: mk('#c79a35', 0.12, 1),             // gold visor
+  steel: mk('#aab1b9', 0.4, 0.85, 'brushed'),          // brushed stainless / aluminium
+  darkSteel: mk('#5a6069', 0.5, 0.8, 'brushed'),
+  paint: mk('#c8cbcf', 0.62, 0.22, 'paint'),           // painted aluminium (off-white)
+  paintGrey: mk('#80868e', 0.62, 0.28, 'paint'),
+  paintDark: mk('#3f444c', 0.66, 0.3, 'paint'),
+  comp: mk('#20252b', 0.5, 0.4, 'rubber'),             // carbon composite
+  rubber: mk('#15171a', 0.95, 0, 'rubber'),
+  foil: mk('#c19a45', 0.34, 0.92, 'foil'),             // gold thermal insulation (MLI)
+  foilSilver: mk('#bcc1c7', 0.32, 0.92, 'foil'),
+  white: mk('#ffffff', 0.6, 0.2, 'paint'),             // base for instanced colours
+  suit: mk('#e6e6e2', 0.78, 0.05, 'rubber'),           // EVA suit fabric
+  visor: mk('#c79a35', 0.12, 1),                       // gold visor
   cable: mk('#1f2226', 0.8, 0.1),
   cableRed: mk('#7a2323', 0.8, 0.1),
   cableBlue: mk('#23406f', 0.8, 0.1),
   cableYellow: mk('#8c7421', 0.8, 0.1),
-  pipeSteel: mk('#8f9aa6', 0.38, 0.75),
-  pipeBlue: mk('#3f6ea8', 0.45, 0.55),       // coolant (cold)
-  pipeOrange: mk('#b3652a', 0.45, 0.55),     // coolant (warm)
+  pipeSteel: mk('#929da9', 0.4, 0.78, 'brushed'),
+  pipeBlue: mk('#3f6ea8', 0.45, 0.55, 'paint'),        // coolant (cold)
+  pipeOrange: mk('#b3652a', 0.45, 0.55, 'paint'),      // coolant (warm)
   glass: new THREE.MeshStandardMaterial({ color: '#a9c2d4', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.2, depthWrite: false }),
   black: mk('#0b0d10', 0.8, 0.2),
 };

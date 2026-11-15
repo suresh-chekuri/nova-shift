@@ -9,6 +9,7 @@ import {
   Bx, Cy, Run, Inst, MAT, CYL, SPH, TOR, LM, LED, Led, Gate, Plate, FloorHazard, HazardStripe, Grate, Hatch, Vent, LedDriver, Beacon, TaskLight,
   LiveScreen, SlidingDoor, screenFrame, meter, mmss, SCR, blink, type V3, type Item, type Draw,
 } from './kit';
+import { Microscope, SampleJars, HatchHardware } from './Hero';
 
 const PI = Math.PI;
 const WEBBING = new THREE.MeshStandardMaterial({ color: '#a4501c', roughness: 0.9, metalness: 0 });
@@ -512,10 +513,9 @@ function LabBench() {
       <Cy p={[-1.0, 1.0, 0]} rad={0.26} h={0.2} m={MAT.paint} />
       <mesh geometry={SPH} material={MAT.paint} position={[-1.0, 1.1, 0]} scale={[0.26, 0.1, 0.26]} />
       <Led p={[-1.0, 0.98, 0.27]} size={0.025} get={(g) => (g.running.analyzer ? LED.green : LED.off)} />
-      {/* microscope */}
-      <Bx p={[0.2, 0.95, 0.1]} s={[0.3, 0.05, 0.25]} m={MAT.darkSteel} />
-      <Cy p={[0.2, 1.12, 0.05]} rad={0.035} h={0.3} m={MAT.black} r={[0.4, 0, 0]} />
-      <Cy p={[0.2, 1.1, -0.05]} rad={0.03} h={0.25} m={MAT.steel} />
+      {/* microscope and sample jars on the shelf */}
+      <Microscope />
+      <SampleJars />
       {/* vial rack and glove box */}
       <Inst items={vials} mat={MAT.white} geo={CYL} />
       <Bx p={[1.0, 1.25, 0]} s={[0.9, 0.6, 0.7]} m={MAT.glass} />
@@ -699,15 +699,8 @@ function OuterHatch() {
       <mesh geometry={TOR} material={MAT.darkSteel} position={[0, 1.45, 0.05]} scale={[1.15, 1.15, 2.4]} />
       <Cy p={[0, 1.45, 0.07]} rad={1.0} h={0.1} m={MAT.paintGrey} r={[PI / 2, 0, 0]} />
       <Cy p={[0, 1.45, 0.14]} rad={0.88} h={0.04} m={MAT.paint} r={[PI / 2, 0, 0]} />
-      {Array.from({ length: 8 }, (_, k) => {
-        const a = (k * PI) / 4 + PI / 8;
-        return <Bx key={k} p={[Math.cos(a) * 0.95, 1.45 + Math.sin(a) * 0.95, 0.15]} s={[0.2, 0.07, 0.06]} m={MAT.steel} r={[0, 0, a]} />;
-      })}
-      {/* hand wheel */}
-      <mesh geometry={TOR} material={MAT.steel} position={[0, 1.3, 0.22]} scale={0.3} />
-      <Bx p={[0, 1.3, 0.22]} s={[0.6, 0.04, 0.04]} m={MAT.steel} />
-      <Bx p={[0, 1.3, 0.22]} s={[0.04, 0.6, 0.04]} m={MAT.steel} />
-      <Cy p={[0, 1.3, 0.2]} rad={0.07} h={0.1} m={MAT.darkSteel} r={[PI / 2, 0, 0]} />
+      {/* locking dogs and hand wheel: they move when the player is inside the airlock */}
+      <HatchHardware />
       {/* porthole */}
       <Cy p={[0, 1.95, 0.16]} rad={0.2} h={0.05} m={MAT.black} r={[PI / 2, 0, 0]} />
       <Cy p={[0, 1.95, 0.19]} rad={0.17} h={0.03} m={MAT.glass} r={[PI / 2, 0, 0]} />

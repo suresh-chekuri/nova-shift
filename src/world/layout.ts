@@ -114,6 +114,8 @@ const PROPS: [number, number, number, number][] = [
   [6.5, 3.2, 0.55, 1.6], // command spares cabinet
   [-27.6, 12.2, 1.6, 1.2], // suit locker (airlock)
   [-23.4, 12.2, 1.6, 1.2], // suit locker (airlock)
+  [-30.15, -1.5, 0.95, 1.6], // coolant pump
+  [-29.9, 5.0, 1.2, 0.8], // maintenance cart
   [-6.3, -21.5, 1.0, 2.0], // server racks
   [-6.3, -24.5, 1.0, 2.0],
   [6.3, -21.5, 1.0, 2.0],

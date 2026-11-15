@@ -79,3 +79,12 @@ The game runs in the phone browser. No app store is needed.
 
 Both planets are drawn by code (craters, continents, clouds, atmosphere glow).
 To use real NASA pictures, see `public/textures/README.md`.
+
+## Ship interior art (files)
+
+- `src/world/interior/pbr.ts` – wall, floor and ceiling maps, plus grain maps, all drawn by code.
+- `src/world/interior/kit.tsx` – shared materials (brushed steel, paint, composite, foil, rubber) and small parts.
+- `src/world/interior/Shell.tsx` – walls, floor plates, ceiling, I-beams, wall ribs, light fixtures, blue accent strips.
+- `src/world/interior/Hero.tsx` – generator, batteries, science instruments, dish, console screens, coolant pump, tool cart, airlock hatch hardware.
+- `src/world/interior/Rooms.tsx` – per-room equipment (racks, benches, seats, suit lockers).
+- Lighting is in `Lights()` in `src/world/Ship.tsx` (each room has its own tint; emergency lights turn warm red).
