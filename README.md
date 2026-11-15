@@ -62,7 +62,7 @@ All sound is made in code (no sound files). One audio system (`src/audio.ts`) ru
 - SETTINGS: Master, Ambient, Sound effects and Music volume, and a MUTE button.
 
 ## Other players
-In multiplayer, the other players are simple astronauts with a ring on the floor in their role color and a name tag. In Settings you can turn on **Real crew suit for other players**. This uses the Advanced Crew Escape Suit model (`public/models/crew-suit.glb`). It is OFF by default because it is heavy. Model detail LOW always uses the simple astronaut.
+In multiplayer, the other players have a ring on the floor in their role color and a name tag. They wear the real Advanced Crew Escape Suit model (`public/models/crew-suit.glb`) is ON by default. You can turn it off in Settings (**Real crew suit for other players**). If it faces backwards, use **FLIP DIRECTION** in Settings. Model detail LOW always uses the simple astronaut.
 
 ## Controls
 W A S D move, mouse look, Shift sprint, E interact, Esc close a panel / free the mouse.

@@ -204,7 +204,8 @@ function Astronaut({ id }: { id: string }) {
     const k = Math.min(1, dt * 10);
     c.x += (r.x - c.x) * k; c.z += (r.z - c.z) * k; c.yaw += (r.yaw - c.yaw) * k;
     grp.current.position.set(c.x, 0, c.z);
-    grp.current.rotation.y = suitOn.current ? c.yaw : c.yaw + Math.PI;
+    // the camera looks down -Z at yaw 0. The simple astronaut's front is -Z; a glTF model's front is normally +Z.
+    grp.current.rotation.y = suitOn.current ? c.yaw + Math.PI : c.yaw;
     grp.current.visible = Date.now() - r.t < 3000;
   });
   const p = useNet.getState().room?.players.find((q) => q.id === id);

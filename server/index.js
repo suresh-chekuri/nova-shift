@@ -23,7 +23,11 @@ const http = createServer((req, res) => {
   let rel = decodeURIComponent((req.url || '/').split('?')[0]);
   if (rel === '/') rel = '/index.html';
   let file = path.join(DIST, rel);
-  if (!file.startsWith(DIST) || !existsSync(file) || !statSync(file).isFile()) file = path.join(DIST, 'index.html');
+  if (!file.startsWith(DIST) || !existsSync(file) || !statSync(file).isFile()) {
+    // a missing asset (like a .glb or .wasm) must be a real 404, so the game can fall back; only page links get index.html
+    if (path.extname(rel)) { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found'); return; }
+    file = path.join(DIST, 'index.html');
+  }
   const ext = path.extname(file).toLowerCase();
   res.writeHead(200, {
     'Content-Type': TYPES[ext] || 'application/octet-stream',
