@@ -28,17 +28,20 @@ export function loadMoon(): Promise<THREE.Object3D | null> {
   if (loading) return loading;
   loading = (async () => {
     try {
-      // A dev server answers a missing file with the HTML page. Detect that before parsing.
-      const head = await fetch(MOON_URL, { method: 'HEAD' }).catch(() => null);
-      if (!head || !head.ok) { report('file not found at ' + MOON_URL); return null; }
-      const type = head.headers.get('content-type') || '';
-      if (type.includes('text/html')) { report('file not found (server returned a web page)'); return null; }
+      // Download the file ourselves, so we can tell a real GLB from a web page (dev servers answer a missing file with HTML).
+      const res = await fetch(MOON_URL).catch(() => null);
+      if (!res || !res.ok) { report('file not found at ' + MOON_URL + (res ? ' (HTTP ' + res.status + ')' : ' (network error)')); return null; }
+      const data = await res.arrayBuffer();
+      const head = new Uint8Array(data.slice(0, 4));
+      const magic = String.fromCharCode(...head);
+      if (magic !== 'glTF' && head[0] !== 0x7b) { report('the file is not a GLB (it starts with "' + magic.replace(/[^\x20-\x7e]/g, '?') + '"). Is it a .zip or a web page?'); return null; }
+      if (magic !== 'glTF') { report('this is a .gltf text file. Please convert it to one .glb file'); return null; }
       const loader = new GLTFLoader();
       const draco = new DRACOLoader();
       draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
       loader.setDRACOLoader(draco);
       loader.setMeshoptDecoder(MeshoptDecoder);
-      const gltf = await loader.loadAsync(MOON_URL);
+      const gltf = await loader.parseAsync(data, MOON_URL.slice(0, MOON_URL.lastIndexOf('/') + 1));
       const root = gltf.scene;
       let meshes = 0;
       root.traverse((o) => { if ((o as THREE.Mesh).isMesh) meshes++; });
