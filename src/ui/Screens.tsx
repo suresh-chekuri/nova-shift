@@ -1,9 +1,8 @@
 import { Rocket, RotateCcw } from 'lucide-react';
-import { useGame, useUI, useNet, useDesign, launch, resetToMenu, setScreen } from '../store';
+import { useGame, useUI, useDesign, launch, resetToMenu, setScreen } from '../store';
 import { lockPointer } from '../controls';
 import { objectiveTexts } from '../sim';
 import { getMission } from '../design';
-import { leaveRoom } from '../net';
 import { sfx } from '../sfx';
 
 export function BriefingScreen() {
@@ -53,7 +52,6 @@ export function BriefingScreen() {
 export function DebriefScreen() {
   const g = useGame();
   const screen = useUI((s) => s.screen);
-  const net = useNet();
   if (screen !== 'game' || (g.phase !== 'won' && g.phase !== 'lost') || !g.result) return null;
   const r = g.result;
   return (
@@ -76,7 +74,7 @@ export function DebriefScreen() {
         <div className="lesson">
           <b>What you practiced:</b> power budgets, battery backup, and how one engineering choice (like your spacecraft design) changes every other system.
         </div>
-        <button className="btn primary huge" onClick={() => { document.exitPointerLock(); if (net.mode !== 'solo') leaveRoom(); resetToMenu(); }}><RotateCcw size={20} /> BACK TO MENU</button>
+        <button className="btn primary huge" onClick={() => { document.exitPointerLock(); resetToMenu(); }}><RotateCcw size={20} /> BACK TO MENU</button>
       </div>
     </div>
   );

@@ -5,12 +5,11 @@ import { setLevels } from './audio';
 import { DEFAULT_DESIGN, MAX_PAYLOAD, isValid, loadDesign, saveDesign, listSaves, writeSaves, part, getMission, type Cat, type Design, type MissionId } from './design';
 
 // ---------------------------------------------------------------- screen / UI state
-export type Screen = 'menu' | 'shipyard' | 'lobby' | 'settings' | 'briefing' | 'game';
-export type Role = 'commander' | 'engineer' | 'science' | 'comms';
+export type Screen = 'menu' | 'shipyard' | 'settings' | 'briefing' | 'game';
 
 export const useUI = create<{
   screen: Screen;
-  shipyardFor: 'menu' | 'mission' | 'tutorial' | 'lobby';
+  shipyardFor: 'menu' | 'mission' | 'tutorial';
   panel: sim.PanelId;
   focus: sim.InstrId | null;
   locked: boolean;
@@ -42,15 +41,13 @@ export function closePanel() {
 // ---------------------------------------------------------------- settings
 export type Quality = 'low' | 'medium' | 'high';
 // `volume` is the MASTER volume (kept under the old name so old saves still work)
-interface Settings { suitDefault: number; crewSuit: boolean; suitFlip: boolean; perf: number; volume: number; ambientVol: number; sfxVol: number; musicVol: number; muted: boolean; sensitivity: number; bloom: boolean; shadows: boolean; quality: Quality }
+interface Settings { perf: number; volume: number; ambientVol: number; sfxVol: number; musicVol: number; muted: boolean; sensitivity: number; bloom: boolean; shadows: boolean; quality: Quality }
 function loadSettings(): Settings {
-  const d: Settings = { suitDefault: 1, crewSuit: true, suitFlip: false, perf: 31, volume: 0.7, ambientVol: 0.7, sfxVol: 0.8, musicVol: 0.5, muted: false, sensitivity: 1, bloom: false, shadows: false, quality: 'medium' };
+  const d: Settings = { perf: 31, volume: 0.7, ambientVol: 0.7, sfxVol: 0.8, musicVol: 0.5, muted: false, sensitivity: 1, bloom: false, shadows: false, quality: 'medium' };
   try {
     const saved = JSON.parse(localStorage.getItem('nova-settings') || '{}');
     // V3.1 speed-up: shadows and glow start OFF once (they cost the most). You can turn them on again in Settings.
     if (saved.perf !== 31) { saved.shadows = false; saved.bloom = false; saved.perf = 31; }
-    // the real crew suit starts ON once (an earlier version saved it as OFF). You can still turn it off in Settings.
-    if (saved.suitDefault !== 1) { saved.crewSuit = true; saved.suitDefault = 1; }
     return { ...d, ...saved };
   } catch { return d; }
 }
@@ -218,56 +215,6 @@ export function deleteSavedDesign(i: number) {
   sfx.click();
 }
 
-// ---------------------------------------------------------------- network state (filled in by net.ts)
-export interface PlayerInfo { id: string; name: string; role: Role | null; ready: boolean; host: boolean }
-export interface RoomInfo { code: string; phase: string; hostId: string; players: PlayerInfo[] }
-export const useNet = create<{
-  mode: 'solo' | 'host' | 'client';
-  connected: boolean;
-  myId: string;
-  room: RoomInfo | null;
-  error: string;
-  remote: Record<string, { x: number; z: number; yaw: number; panel: string | null; t: number }>;
-}>()(() => ({ mode: 'solo', connected: false, myId: '', room: null, error: '', remote: {} }));
-
-// hooks the network layer fills in (kept here so the store has no import cycle)
-export const netHooks: { sendAction: (name: string, args: any[]) => void; sendState: (s: any) => void; sendPos: (p: any) => void } = {
-  sendAction: () => {},
-  sendState: () => {},
-  sendPos: () => {},
-};
-
-// ---------------------------------------------------------------- who may do what
-export const ACTION_ROLES: Record<string, Role[]> = {
-  restartGenerator: ['engineer'],
-  resetDistribution: ['engineer'],
-  toggleInstrument: ['science'],
-  setAntenna: ['comms'],
-  repairAntenna: ['comms'],
-  toggleTransmit: ['comms'],
-  order: ['commander'],
-};
-export const ROLE_NAME: Record<Role, string> = { commander: 'COMMANDER', engineer: 'ENGINEER', science: 'SCIENCE OFFICER', comms: 'COMMUNICATIONS OFFICER' };
-
-// Which roles may do an action. Used by allowed() AND by the "Only the ..." message, so they always agree.
-export function rolesFor(name: string, args: any[]): Role[] | undefined {
-  if (name === 'toggleSwitch') return args[0] === 'eng' ? ['engineer', 'commander'] : ['engineer'];
-  return ACTION_ROLES[name];
-}
-
-export function allowed(name: string, args: any[], actor: Role | null, players: PlayerInfo[]): boolean {
-  const roles = rolesFor(name, args);
-  if (!roles || players.length === 0) return true;
-  if (actor && roles.includes(actor)) return true;
-  // if nobody holds any of the needed roles, anyone may act
-  return !players.some((p) => p.role && roles.includes(p.role));
-}
-
-export function myRole(): Role | null {
-  const n = useNet.getState();
-  return n.room?.players.find((p) => p.id === n.myId)?.role ?? null;
-}
-
 // ---------------------------------------------------------------- game state
 type Actions = {
   toggleSwitch: (id: sim.SwitchId) => void;
@@ -278,7 +225,7 @@ type Actions = {
   repairAntenna: () => void;
   toggleTransmit: () => void;
   order: (text: string) => void;
-  step: (dt: number, broadcast?: boolean) => void;
+  step: (dt: number) => void;
 };
 export type Store = sim.GameState & Actions;
 
@@ -304,31 +251,9 @@ export function mutate(fn: (g: sim.GameState) => void) {
   useGame.setState(g as any);
 }
 
-// Every player action goes through here. Solo/host: apply now. Client: ask the host.
+// Every player action goes through here: play the sound, then change the game state.
 function act(name: string, args: any[]) {
-  const net = useNet.getState();
-  const players = net.room?.players ?? [];
-  const role = myRole();
-  if (!allowed(name, args, role, players)) {
-    sfx.warn();
-    const need = (rolesFor(name, args) ?? []).map((r) => ROLE_NAME[r]).join(' / ');
-    showToast('Only the ' + need + ' can do this.');
-    return;
-  }
   SOUND[name]?.();
-  if (net.mode === 'client') netHooks.sendAction(name, args);
-  else mutate((g) => LOCAL[name](g, ...args));
-}
-
-// The host applies actions that other players send.
-export function applyRemoteAction(name: string, args: any[], fromId: string) {
-  const net = useNet.getState();
-  const players = net.room?.players ?? [];
-  const from = players.find((p) => p.id === fromId);
-  if (!LOCAL[name] || !allowed(name, args, from?.role ?? null, players)) {
-    console.warn('[NOVA SHIFT] host rejected action', name, 'from', from?.name ?? fromId, '(role:', from?.role ?? 'none', ')');
-    return;
-  }
   mutate((g) => LOCAL[name](g, ...args));
 }
 
@@ -342,26 +267,11 @@ export const useGame = create<Store>()(() => ({
   repairAntenna: () => act('repairAntenna', []),
   toggleTransmit: () => act('toggleTransmit', []),
   order: (text) => act('order', [text]),
-  step: (dt, broadcast = true) => {
-    const ui = useUI.getState();
-    const net = useNet.getState();
-    const remoteComms = (Object.values(net.remote) as { panel: string | null; t: number }[]).some((r) => r.panel === 'comms' && Date.now() - r.t < 2000);
-    const ctx = { commsOpen: ui.panel === 'comms' || remoteComms };
+  step: (dt) => {
+    const ctx = { commsOpen: useUI.getState().panel === 'comms' };
     mutate((g) => sim.tick(g, dt, Math.random, ctx));
-    if (net.mode === 'host' && broadcast) netHooks.sendState(sim.cloneData(useGame.getState()));
   },
 }));
-
-// A browser tab in the background stops drawing frames, so the game loop would freeze for everyone.
-// The host calls this from a timer to catch up, so friends keep playing while the host looks at another window.
-export function hostCatchUp(seconds: number) {
-  const steps = Math.floor(Math.min(seconds, 30) / 0.1);
-  for (let i = 0; i < steps; i++) {
-    if (useGame.getState().phase !== 'playing') break;
-    useGame.getState().step(0.1, false);
-  }
-  if (steps > 0 && useNet.getState().mode === 'host') netHooks.sendState(sim.cloneData(useGame.getState()));
-}
 
 // ---------------------------------------------------------------- flow
 export function launch(mode: 'mission' | 'tutorial' = 'mission', design?: Design) {

@@ -1,6 +1,6 @@
 # NOVA SHIFT: THE LAST SIGNAL (V2)
 
-Design a spacecraft. Engineer its power. Survive the mission. Up to 4 players can play together.
+Design a spacecraft. Engineer its power. Survive the mission. This is a single-player game.
 
 ## Run it
 1. Install Node.js 18 or newer.
@@ -8,20 +8,14 @@ Design a spacecraft. Engineer its power. Survive the mission. Up to 4 players ca
 3. Then run: `npm run dev`
 4. Open http://localhost:5173 in Chrome or Edge.
 
-`npm run dev` starts two things: the game (Vite, port 5173) and the multiplayer server (Socket.IO, port 3001).
+`npm run dev` starts the game (Vite, port 5173).
 
-## Play with friends (same Wi-Fi)
-1. The host runs `npm run dev`.
-2. The host finds their computer's IP address (for example 192.168.1.20).
-3. Friends open `http://HOST-IP:5173`.
-4. Host: MULTIPLAYER > HOST GAME. Share the 4-letter code.
-5. Friends: MULTIPLAYER > JOIN GAME. Pick a role and press READY.
-6. Host: design the ship in the Shipyard, then START MISSION.
+## Put it online (optional)
+Run `npm run build`, then `npm start`. The server serves the built game on one port (`PORT`, default 3001). The file `render.yaml` has the settings for Render.
 
 ## Main menu
 - NEW MISSION: unlocks after the tutorial. Opens the Shipyard, then the briefing.
 - DESIGN SPACECRAFT: build and save your ship.
-- MULTIPLAYER: host or join a crew.
 - TUTORIAL: 7 guided steps (movement, design, power, comms, science, objectives, complete).
 - SETTINGS: volume, mouse speed, bloom glow, shadows.
 
@@ -61,26 +55,11 @@ All sound is made in code (no sound files). One audio system (`src/audio.ts`) ru
 - Alarms play in short pulses and get quieter. They stop when the problem is fixed.
 - SETTINGS: Master, Ambient, Sound effects and Music volume, and a MUTE button.
 
-## Other players
-In multiplayer, the other players have a ring on the floor in their role color and a name tag. They wear the real Advanced Crew Escape Suit model (`public/models/crew-suit.glb`) is ON by default. You can turn it off in Settings (**Real crew suit for other players**). If it faces backwards, use **FLIP DIRECTION** in Settings. Model detail LOW always uses the simple astronaut.
-
 ## Controls
 W A S D move, mouse look, Shift sprint, E interact, Esc close a panel / free the mouse.
 
-## Roles (multiplayer)
-- COMMANDER: objectives, orders, engine.
-- ENGINEER: generator, power routing, repairs.
-- SCIENCE OFFICER: instruments.
-- COMMUNICATIONS OFFICER: antenna and transmit.
-If a role is empty, anyone can do that job. The host runs the mission; other players send actions to the host.
-
 ## Tests
 - `npm run test:sim` — mission, power, design rules
-- `npm run test:rooms` — multiplayer rooms
 - `npm run test:layout` — every room and console can be reached
 - audio test: `npx tsx scripts/audio-test.ts` (uses a fake sound card; no speakers needed)
 
-## Multiplayer notes
-- The host runs the mission. If the host's browser tab is hidden, a timer keeps the mission running for the other players.
-- If the host leaves, the room closes for everyone. There is no reconnect: if your internet drops, join a new room.
-- The server ignores bad messages instead of crashing, and it waits up to 60 seconds for a slow tab to answer.

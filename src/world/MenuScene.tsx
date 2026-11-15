@@ -11,7 +11,6 @@ import { useDesign, useUI } from '../store';
 const PRESET: Record<string, { r: number; h: number; speed: number }> = {
   menu: { r: 12, h: 2.2, speed: 0.07 },
   briefing: { r: 9, h: 1.2, speed: 0.05 },
-  lobby: { r: 15, h: 3, speed: 0.04 },
   settings: { r: 15, h: 3, speed: 0.04 },
 };
 

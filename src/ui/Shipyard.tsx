@@ -86,7 +86,6 @@ export function ShipyardUI() {
 
   const back = () => {
     if (mode === 'tutorial') useUI.setState({ screen: 'game' });
-    else if (mode === 'lobby') useUI.setState({ screen: 'lobby' });
     else useUI.setState({ screen: 'menu' });
   };
   const attach = () => { if (selPart) attachPart(cat, selPart.id); else { showToast('First choose a part in the list.'); sfx.warn(); } };
@@ -106,7 +105,7 @@ export function ShipyardUI() {
   return (
     <div className="yard">
       <div className="yard-top">
-        <button className="btn" onClick={() => { sfx.click(); back(); }}><ArrowLeft size={14} /> {tutorial ? 'RETURN TO SHIP' : mode === 'lobby' ? 'SAVE & RETURN TO LOBBY' : 'SAVE & EXIT'}</button>
+        <button className="btn" onClick={() => { sfx.click(); back(); }}><ArrowLeft size={14} /> {tutorial ? 'RETURN TO SHIP' : 'SAVE & EXIT'}</button>
         <div className="yard-mid">
           <div className="yard-title">SHIPYARD <small>{mission.name}: {mission.objective}</small></div>
           {!tutorial && (
@@ -212,8 +211,8 @@ export function ShipyardUI() {
           <button className="btn" onClick={() => { sfx.click(); setLoading(true); }} title="Load a saved design"><FolderOpen size={14} /> LOAD</button>
           <button className="btn" onClick={validateNow} title="Check all launch rules"><ShieldCheck size={14} /> VALIDATE</button>
           {!tutorial && (
-            <button className={'btn launch' + (valid ? ' primary pulse' : '')} disabled={mode === 'lobby'} onClick={launchBtn} title={mode === 'lobby' ? 'Go back to the lobby. The host presses START MISSION there.' : valid ? 'Go to the mission briefing' : 'Shows what you must fix'}>
-              <Rocket size={16} /> {mode === 'lobby' ? 'START IN LOBBY' : valid ? 'LAUNCH' : 'LAUNCH (FIX CHECKS)'}
+            <button className={'btn launch' + (valid ? ' primary pulse' : '')} onClick={launchBtn} title={valid ? 'Go to the mission briefing' : 'Shows what you must fix'}>
+              <Rocket size={16} /> {valid ? 'LAUNCH' : 'LAUNCH (FIX CHECKS)'}
             </button>
           )}
         </div>

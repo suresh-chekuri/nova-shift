@@ -36,7 +36,3 @@ Example:
 - Kenney assets (CC0): https://kenney.nl/assets
 
 Keep the license text and credit the author when the license asks for it.
-
-
-## Crew suit (other players)
-`crew-suit.glb` is the suit worn by the other players in multiplayer. It is Draco-compressed, so `npm install` / `npm run dev` copies the decoder into `public/draco` (script: `scripts/copy-draco.mjs`). It is scaled to a person's height automatically. If it faces backwards, use SETTINGS > FLIP DIRECTION. With Model detail LOW, the simple astronaut is used instead.

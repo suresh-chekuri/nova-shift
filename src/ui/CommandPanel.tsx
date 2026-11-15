@@ -1,5 +1,5 @@
 import { Rocket, Cpu, CheckCircle2, Circle } from 'lucide-react';
-import { useGame, useNet, myRole } from '../store';
+import { useGame } from '../store';
 import { Frame } from './Frame';
 import { fmtTime } from './HUD';
 import { getMission } from '../design';
@@ -9,7 +9,6 @@ const ORDERS = ['Restart the generator!', 'Route power to Life Support first.', 
 
 export function CommandPanel() {
   const g = useGame();
-  const net = useNet();
   const goal = nextGoal(g);
   const total = sumData(g);
   return (
@@ -26,7 +25,7 @@ export function CommandPanel() {
             ))}
           </div>
           <div className="callout info"><b>NEXT:</b> {goal.text}</div>
-          {(!net.room || myRole() === 'commander') && (
+          {(
             <div>
               <div className="subhead">COMMANDER ORDERS</div>
               <div className="row wrap">

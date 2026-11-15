@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Rocket, Wrench, Users, GraduationCap, Settings as Cog, Lock } from 'lucide-react';
+import { Rocket, Wrench, GraduationCap, Settings as Cog, Lock } from 'lucide-react';
 import { useUI, setScreen, tutorialDone } from '../store';
 import { startTutorial } from '../tutorial';
 import { sfx } from '../sfx';
@@ -34,7 +34,6 @@ export function MainMenu() {
         <div className="menu-list">
           <MenuButton icon={<Rocket size={20} />} label="NEW MISSION" sub={done ? 'Design your ship and launch' : 'Locked until training is complete'} locked={!done} onClick={newMission} />
           <MenuButton icon={<Wrench size={20} />} label="DESIGN SPACECRAFT" sub="Open the Shipyard" onClick={() => useUI.setState({ shipyardFor: 'menu', screen: 'shipyard' })} />
-          <MenuButton icon={<Users size={20} />} label="MULTIPLAYER" sub="Up to 4 crew members" onClick={() => setScreen('lobby')} />
           <MenuButton icon={<GraduationCap size={20} />} label="TUTORIAL" sub={done ? 'Replay the training' : 'Recommended first'} onClick={startTutorial} />
           <MenuButton icon={<Cog size={20} />} label="SETTINGS" sub="Sound, mouse, graphics" onClick={() => setScreen('settings')} />
         </div>

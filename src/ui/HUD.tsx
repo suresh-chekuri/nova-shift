@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Zap, Battery, Database, Radio, Clock, ShieldCheck, CheckCircle2, Circle, AlertTriangle } from 'lucide-react';
-import { useGame, useUI, useNet, myRole, ROLE_NAME } from '../store';
+import { useGame, useUI } from '../store';
 import { INTERACTABLES } from '../world/layout';
 import { objectiveTexts, nextGoal, isEmergency, sumData, DATA_GOAL } from '../sim';
 import { lockPointer, pose } from '../controls';
@@ -48,19 +48,14 @@ function Waypoint({ targetId }: { targetId: string | null }) {
 export function HUD() {
   const g = useGame();
   const ui = useUI();
-  const net = useNet();
   if (g.phase !== 'playing' || ui.screen !== 'game') return null;
   const targetId = ui.markerTarget !== undefined ? ui.markerTarget : nextGoal(g).target;
-  const role = myRole();
   const goal = nextGoal(g);
   const total = sumData(g);
   const emergency = isEmergency(g);
   const recent = g.log.filter((l) => g.elapsed - l.t < 7 && l.level !== 'info').slice(-3);
   const infoRecent = g.log.filter((l) => g.elapsed - l.t < 9 && l.level === 'info').slice(-1);
-  // No mouse capture = no movement or E. In solo this pauses the game; in multiplayer the mission keeps
-  // running (the host runs it), but the player still needs a click to capture the mouse — a mission
-  // started by the host's game:start message never got a click from this player.
-  const solo = net.mode === 'solo';
+  // No mouse capture = no movement or E. The game pauses until the player clicks.
   const paused = !ui.locked && !ui.panel;
   const flash = g.elapsed - g.flashAt < 2.5;
   const cap = g.genOutput + ((g.sw.bj1 || g.sw.bj2) && g.battery > 0 ? g.stats.battOutput : 0);
@@ -78,13 +73,6 @@ export function HUD() {
         <Meter icon={<Radio size={13} />} label="COMMS" value={`${Math.floor(g.commsStrength)}%`} frac={g.commsStrength / 100} color={g.commsLinked ? '#22c55e' : '#f59e0b'} />
         <Meter icon={<ShieldCheck size={13} />} label="INTEGRITY" value={`${Math.floor(g.integrity)}%`} frac={g.integrity / 100} color={g.integrity < 35 ? '#ef4444' : '#f472b6'} />
         <div className={'timer' + (g.timeLeft < 60 && g.mode === 'mission' ? ' low' : '')}><Clock size={16} /> {g.mode === 'tutorial' ? 'TRAINING' : fmtTime(g.timeLeft)}</div>
-        {net.room && (
-          <div className="crew">
-            {net.room.players.map((p) => (
-              <div key={p.id} className={'crew-row' + (p.id === net.myId ? ' me' : '')}><span className={'dot ' + (p.role ?? '')} />{p.name}<em>{p.role ? ROLE_NAME[p.role] : '—'}</em></div>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="hud-right">
@@ -111,7 +99,6 @@ export function HUD() {
 
       <div className="hud-bottom-left">
         <div className="room">{ui.room}</div>
-        {role && <div className="role-badge">YOU ARE: {ROLE_NAME[role]}</div>}
         {g.elapsed < 25 && <div className="hint">W A S D move · Mouse look · Shift sprint · E interact · Esc close panel</div>}
       </div>
 
@@ -122,9 +109,9 @@ export function HUD() {
       {paused && (
         <div className="pause" onClick={lockPointer}>
           <div className="pause-box">
-            <h2>{solo ? 'PAUSED' : 'CLICK TO TAKE CONTROL'}</h2>
+            <h2>PAUSED</h2>
             <p>Click anywhere to return to the ship.</p>
-            <p className="dim">{solo ? 'The mission clock stops while paused.' : 'The mission keeps running for your crew.'}</p>
+            <p className="dim">The mission clock stops while paused.</p>
           </div>
         </div>
       )}

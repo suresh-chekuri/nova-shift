@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { EffectComposer, Bloom, ToneMapping } from '@react-three/postprocessing';
 import { Ship } from './world/Ship';
-import { Player, GameLoop, RemotePlayers } from './world/Player';
+import { Player, GameLoop } from './world/Player';
 import { MenuScene } from './world/MenuScene';
 import { ShipyardScene } from './world/ShipyardScene';
 import { HUD } from './ui/HUD';
@@ -14,7 +14,6 @@ import { BriefingScreen, DebriefScreen } from './ui/Screens';
 import { MainMenu } from './ui/MainMenu';
 import { SettingsScreen } from './ui/Settings';
 import { ShipyardUI } from './ui/Shipyard';
-import { LobbyScreen } from './ui/Lobby';
 import { TutorialCard } from './ui/TutorialCard';
 import { Toast } from './ui/Toast';
 import { useGame, useUI, useSettings, setScreen, showToast } from './store';
@@ -49,7 +48,6 @@ function World() {
         <>
           <Ship />
           <Player />
-          <RemotePlayers />
         </>
       )}
       {screen === 'shipyard' && <ShipyardScene />}
@@ -118,7 +116,6 @@ export default function App() {
       <GameTutorial />
       <MainMenu />
       <SettingsScreen />
-      <LobbyScreen />
       <ShipyardUI />
       <BriefingScreen />
       <DebriefScreen />
